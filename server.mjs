@@ -1692,7 +1692,7 @@ export async function searchSautoCz(
         accidentFree: true,
         crashed: false,
         thumbnail: imgRaw
-          ? `${imgRaw.startsWith('//') ? 'https:' : ''}${imgRaw}?fl=res,400,300,3|jpg,80,,1`
+          ? `${imgRaw.startsWith('//') ? 'https:' : ''}${imgRaw}?fl=exf|crr,1.33333,0|res,800,600,1|wrm,/watermark/sauto.png,10,10|jpg,80,,1`
           : null,
         url: `https://www.sauto.cz/osobni/detail/${makeSeo}/${modelSeo}/${x.id}`,
       };
