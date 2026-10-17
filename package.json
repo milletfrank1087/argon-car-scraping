@@ -1,0 +1,13 @@
+{
+  "name": "cargr-fast-search-backend",
+  "version": "1.0.0",
+  "description": "Sub-second warm-session Playwright backend for searching and ranking any car on car.gr",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "search": "node server.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "build_command": "npx playwright install --with-deps chromium",
+  "start_command": "node server.mjs"
+}
