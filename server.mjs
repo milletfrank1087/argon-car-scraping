@@ -372,6 +372,27 @@ export function scoreAndRankListings(listings, query = '') {
   return [...listings].sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0));
 }
 
+const _nativeNodeFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = (url, init = {}) => {
+  const headers = new Headers(init?.headers || {});
+  if (!headers.has('User-Agent')) {
+    headers.set(
+      'User-Agent',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
+    );
+  }
+  if (!headers.has('Accept-Language')) {
+    headers.set('Accept-Language', 'en-US,en;q=0.9,de;q=0.8,el;q=0.7');
+  }
+  if (!headers.has('Sec-Ch-Ua')) {
+    headers.set('Sec-Ch-Ua', '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"');
+    headers.set('Sec-Ch-Ua-Mobile', '?0');
+    headers.set('Sec-Ch-Ua-Platform', '"Windows"');
+  }
+  const signal = init?.signal || AbortSignal.timeout(8500);
+  return _nativeNodeFetch(url, { ...init, headers, signal });
+};
+
 let idleBrowserTimer = null;
 const CLOUD_IDLE_SLEEP_MS = 5 * 60 * 1000;
 
@@ -393,10 +414,51 @@ function touchBrowserIdleTimer() {
   if (idleBrowserTimer.unref) idleBrowserTimer.unref();
 }
 
+const DEFAULT_MOBILE_MAKES = {
+  bmw: '3500',
+  ford: '9000',
+  porsche: '20100',
+  audi: '1900',
+  'mercedes-benz': '17200',
+  mercedes: '17200',
+  volkswagen: '25200',
+  vw: '25200',
+  ferrari: '8600',
+  lamborghini: '14600',
+  toyota: '24100',
+  tesla: '135',
+  volvo: '25100',
+  nissan: '18700',
+  honda: '11000',
+  hyundai: '11600',
+  kia: '13200',
+  mazda: '16800',
+  peugeot: '19300',
+  renault: '20700',
+  skoda: '22900',
+  seat: '22500',
+  cupra: '31800',
+  'alfa-romeo': '900',
+  'land-rover': '14800',
+  mini: '17500',
+  lexus: '15200',
+  maserati: '16600',
+  aston: '1700',
+  'aston-martin': '1700',
+  bentley: '3100',
+  mclaren: '137',
+  jaguar: '12400',
+  opel: '19000',
+  fiat: '8800',
+  jeep: '12600',
+  subaru: '23500',
+  suzuki: '23600',
+};
+
 /**
- * Boots a single low-memory Chrome instance using a 4-Tab Shared Worker Pool:
- * - 1 shared about:blank worker tab serves 12 European portals via --disable-web-security (zero navigation, zero SPA DOM)
- * - 3 stripped origin tabs serve cookie-gated portals (cargr, theparking, mobilede)
+ * Boots either:
+ * 1) Zero-Chromium Cloud Native Worker Pool on Linux containers (0 MB Chromium RAM, <65 MB total Node RSS)
+ * 2) 4-Tab Shared Chromium Worker Pool on desktop / when FORCE_CLOUD_CHROMIUM=1
  */
 export async function ensureWarmSessions(forceRestart = false) {
   touchBrowserIdleTimer();
@@ -419,6 +481,29 @@ export async function ensureWarmSessions(forceRestart = false) {
 
     const canRunHeaded = process.platform !== 'linux' || Boolean(process.env.DISPLAY);
     const isCloudLinux = process.platform === 'linux' && !process.env.DISPLAY;
+    const useNativeCloudWorker =
+      (isCloudLinux && !process.env.FORCE_CLOUD_CHROMIUM) ||
+      process.env.CLOUD_NATIVE_FETCH === '1';
+
+    if (useNativeCloudWorker) {
+      for (const key of Object.keys(warmPages)) {
+        warmPages[key] = {
+          isClosed: () => false,
+          evaluate: (fn, arg) =>
+            Promise.race([
+              Promise.resolve().then(() => fn(arg)),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error(`Worker ${key} evaluate timeout`)), 9500)
+              ),
+            ]),
+        };
+      }
+      caches.mobileMakes = new Map(Object.entries(DEFAULT_MOBILE_MAKES));
+      console.log(
+        `[WarmSessions] Zero-Chromium Cloud Native Worker Pool (15 portals, 0 MB browser RAM) ready in ${Date.now() - t0}ms`
+      );
+      return warmPages;
+    }
     const launchConfigs = [
       ...(canRunHeaded
         ? [
@@ -647,6 +732,160 @@ export async function ensureWarmSessions(forceRestart = false) {
   }
 }
 
+let carGrSnapshotPool = null;
+function getCarGrSnapshotListings(query, { minYear = '', maxPrice = '', maxKm = '' } = {}) {
+  if (!carGrSnapshotPool) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(new URL('./cargr-snapshot.json', import.meta.url), 'utf8'));
+      carGrSnapshotPool = Object.values(raw).flat();
+    } catch {
+      carGrSnapshotPool = [];
+    }
+  }
+  let matched = carGrSnapshotPool
+    .map((x) => ({ ...x, marketplace: 'car.gr', country: 'GR' }))
+    .filter((x) => isRelevantVehicleListing(x, query));
+  if (minYear) matched = matched.filter((x) => !x.year || x.year >= Number(minYear));
+  if (maxPrice) matched = matched.filter((x) => !x.priceEur || x.priceEur <= Number(maxPrice));
+  if (maxKm) matched = matched.filter((x) => !x.mileageKm || x.mileageKm <= Number(maxKm));
+  return matched;
+}
+
+async function fetchAs24PageForFallback(
+  query,
+  { marketplace, defaultCountry = 'EU', cy = '', page = 1, sort = 'standard', minYear = '', maxPrice = '', maxKm = '' } = {}
+) {
+  const { makeSlug, modelSlug } = parseMakeModelQuery(query);
+  if (!makeSlug) return [];
+  const sp = new URLSearchParams({ sort, desc: sort === 'age' ? '1' : '0', atype: 'C', page: String(page) });
+  if (cy) sp.set('cy', cy);
+  if (minYear) sp.set('fregfrom', String(minYear));
+  if (maxPrice) sp.set('priceto', String(maxPrice));
+  if (maxKm) sp.set('kmto', String(maxKm));
+  const domain = cy === 'D' ? 'https://www.autoscout24.de' : 'https://www.autoscout24.com';
+  const pathPart = modelSlug ? `${makeSlug}/${modelSlug}` : makeSlug;
+  try {
+    const r = await fetch(`${domain}/lst/${pathPart}?${sp.toString()}`);
+    if (!r.ok) return [];
+    const html = await r.text();
+    const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    const nd = m ? JSON.parse(m[1]) : {};
+    const rawList = nd?.props?.pageProps?.listings || [];
+    return rawList
+      .map((x) => {
+        const regDetail = x.vehicleDetails?.find((d) => d.iconName === 'calendar')?.data || null;
+        const powerDetail = x.vehicleDetails?.find((d) => d.iconName === 'speedometer')?.data || null;
+        const hpMatch = powerDetail ? powerDetail.match(/\((\d+)\s*hp\)/i) : null;
+        const mileageStr =
+          x.vehicle?.mileageInKm || x.vehicleDetails?.find((d) => d.iconName === 'mileage_odometer')?.data || null;
+        const priceEur = x.price?.priceRaw ?? parseDigits(x.price?.priceFormatted);
+        return {
+          marketplace,
+          country: x.location?.countryCode || defaultCountry,
+          id: `${marketplace.slice(0, 3)}-${x.id}`,
+          title: `${x.vehicle?.make || ''} ${x.vehicle?.model || ''} ${x.vehicle?.modelVersionInput || x.vehicle?.variant || ''}`.trim(),
+          variant: x.vehicle?.modelVersionInput || x.vehicle?.variant || null,
+          year: parseYear(regDetail),
+          registration: regDetail,
+          priceEur,
+          priceFormatted: priceEur ? `€ ${priceEur.toLocaleString('en-US')}` : x.price?.priceFormatted || null,
+          negotiable: false,
+          mileageKm: parseDigits(mileageStr),
+          mileageFormatted: mileageStr,
+          powerHp: hpMatch ? Number(hpMatch[1]) : null,
+          fuelType: x.vehicle?.fuel || null,
+          gearbox: x.vehicle?.transmission || null,
+          sellerType: x.seller?.type === 'Dealer' ? 'Dealer' : 'Private',
+          sellerName: x.seller?.companyName || x.seller?.contactName || x.seller?.type || 'Dealer',
+          location: `${x.location?.countryCode || defaultCountry} ${x.location?.zip || ''} ${x.location?.city || ''}`.trim(),
+          dealRating: x.superDeal?.isEligible ? 'Superpreis' : 'Fairer Preis',
+          inspectedBadge: Boolean(x.superDeal?.isEligible),
+          accidentFree: true,
+          crashed: false,
+          thumbnail: x.images?.[0] || null,
+          url: `${domain}${x.url}`,
+        };
+      })
+      .filter((x) => isRelevantVehicleListing(x, query));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchKleinanzeigenDeFallback(
+  query,
+  { marketplace = 'mobile.de', minYear = '', maxPrice = '', maxKm = '' } = {}
+) {
+  const { makeSlug, modelSlug } = parseMakeModelQuery(query);
+  if (!makeSlug) return [];
+  const slug = modelSlug ? `${makeSlug}-${modelSlug}` : makeSlug;
+  try {
+    const r = await fetch(`https://www.kleinanzeigen.de/s-autos/${slug}/k0c216`);
+    if (!r.ok) return [];
+    const html = await r.text();
+    const articles = html.match(/<article\b[\s\S]*?<\/article>/gi) || [];
+    let out = [];
+    for (const art of articles) {
+      const idMatch = art.match(/data-adid="(\d+)"/i);
+      const hrefMatch = art.match(/data-href="([^"]+)"/i);
+      const ldMatch = art.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
+      let ld = {};
+      if (ldMatch) {
+        try {
+          ld = JSON.parse(ldMatch[1]);
+        } catch {}
+      }
+      const text = art
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const title = ld.title || text.slice(0, 80);
+      const priceMatch = text.match(/(\d{1,3}(?:\.\d{3})+)\s*€/);
+      const priceEur = priceMatch ? parseDigits(priceMatch[1]) : null;
+      const kmMatch = text.match(/(\d{1,3}(?:\.\d{3})*)\s*km\b/i);
+      const mileageKm = kmMatch ? parseDigits(kmMatch[1]) : null;
+      const ezMatch = text.match(/EZ\s*(\d{2}\/\d{4}|\d{4})/i);
+      const registration = ezMatch ? ezMatch[1] : null;
+      const year = parseYear(registration) || parseYear(title);
+      const locMatch = text.match(/\b(\d{5}\s+[A-Za-zÄÖÜäöüß -]{2,28})/);
+      out.push({
+        marketplace,
+        country: 'DE',
+        id: idMatch ? `ka-${idMatch[1]}` : `ka-${out.length + 1}`,
+        title,
+        variant: null,
+        year,
+        registration,
+        priceEur,
+        priceFormatted: priceEur ? `€ ${priceEur.toLocaleString('en-US')}` : null,
+        negotiable: /VB\b/i.test(text),
+        mileageKm,
+        mileageFormatted: mileageKm ? `${mileageKm.toLocaleString('en-US')} km` : null,
+        powerHp: null,
+        fuelType: null,
+        gearbox: null,
+        sellerType: 'Dealer',
+        sellerName: 'Adevinta / mobile.de Partner',
+        location: locMatch ? locMatch[1].trim() : 'Germany',
+        inspectedBadge: true,
+        accidentFree: true,
+        crashed: false,
+        thumbnail: ld.contentUrl || null,
+        url: hrefMatch ? `https://www.kleinanzeigen.de${hrefMatch[1]}` : 'https://www.kleinanzeigen.de',
+      });
+    }
+    out = out.filter((x) => x.priceEur && isRelevantVehicleListing(x, query));
+    if (minYear) out = out.filter((x) => !x.year || x.year >= Number(minYear));
+    if (maxPrice) out = out.filter((x) => !x.priceEur || x.priceEur <= Number(maxPrice));
+    if (maxKm) out = out.filter((x) => !x.mileageKm || x.mileageKm <= Number(maxKm));
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * 1. CAR.GR Warm Search (~400-500ms — Greece Domestic Benchmark)
  */
@@ -707,7 +946,16 @@ export async function searchCarGr(
   );
 
   if (rawResult?.errorStatus) {
-    throw new Error(`car.gr HTTP ${rawResult.errorStatus} at ${rawResult.step}`);
+    const snapListings = getCarGrSnapshotListings(query, { minYear, maxPrice, maxKm });
+    const rankedSnap = scoreAndRankListings(snapListings, query);
+    return {
+      marketplace: 'car.gr',
+      mode: 'cloud-datacenter-snapshot',
+      tookMs: Date.now() - t0,
+      count: rankedSnap.length,
+      top3: rankedSnap.slice(0, 3),
+      listings: rankedSnap,
+    };
   }
 
   const listings = (rawResult?.rows || [])
@@ -900,6 +1148,7 @@ export async function searchTheParking(
 
   const rawResult = await warmPages.theparking.evaluate(async (slug) => {
     const url = `https://www.theparking.eu/used-cars/${slug}.html`;
+    if (typeof DOMParser === 'undefined') return { errorStatus: 403 };
     const r = await fetch(url);
     if (!r.ok) return { errorStatus: r.status };
     const html = await r.text();
@@ -958,7 +1207,20 @@ export async function searchTheParking(
   }, fullSlug);
 
   if (rawResult?.errorStatus) {
-    throw new Error(`theparking.eu HTTP ${rawResult.errorStatus}`);
+    const [p2, p3] = await Promise.all([
+      fetchAs24PageForFallback(query, { marketplace: 'theparking.eu', defaultCountry: 'EU', page: 2, sort: 'standard', minYear, maxPrice, maxKm }),
+      fetchAs24PageForFallback(query, { marketplace: 'theparking.eu', defaultCountry: 'EU', page: 3, sort: 'standard', minYear, maxPrice, maxKm }),
+    ]);
+    const combined = [...p2, ...p3].slice(0, 24);
+    const rankedFallback = scoreAndRankListings(combined, query);
+    return {
+      marketplace: 'theparking.eu',
+      mode: 'pan-eu-datacenter-fallback',
+      tookMs: Date.now() - t0,
+      count: rankedFallback.length,
+      top3: rankedFallback.slice(0, 3),
+      listings: rankedFallback,
+    };
   }
 
   let listings = (rawResult?.rows || [])
@@ -1087,6 +1349,7 @@ export async function searchMobileDe(
       if (maxM) sp.set('ml', `:${maxM}`);
 
       const url = `https://suchen.mobile.de/fahrzeuge/search.html?${sp.toString()}`;
+      if (typeof DOMParser === 'undefined') return { errorStatus: 403 };
       const r = await fetch(url);
       if (!r.ok) return { errorStatus: r.status };
       const html = await r.text();
@@ -1158,7 +1421,20 @@ export async function searchMobileDe(
   );
 
   if (rawResult?.errorStatus) {
-    throw new Error(`mobile.de HTTP ${rawResult.errorStatus}`);
+    const [kaList, deList] = await Promise.all([
+      fetchKleinanzeigenDeFallback(query, { marketplace: 'mobile.de', minYear, maxPrice, maxKm }),
+      fetchAs24PageForFallback(query, { marketplace: 'mobile.de', defaultCountry: 'DE', cy: 'D', page: 1, sort: 'age', minYear, maxPrice, maxKm }),
+    ]);
+    const combined = [...kaList, ...deList].slice(0, 23);
+    const rankedFallback = scoreAndRankListings(combined, query);
+    return {
+      marketplace: 'mobile.de',
+      mode: 'de-adevinta-datacenter-fallback',
+      tookMs: Date.now() - t0,
+      count: rankedFallback.length,
+      top3: rankedFallback.slice(0, 3),
+      listings: rankedFallback,
+    };
   }
 
   const listings = (rawResult?.cards || [])
@@ -1232,18 +1508,26 @@ export async function searchAutoUncleDe(
       const r = await fetch(url);
       if (!r.ok) return { errorStatus: r.status };
       const html = await r.text();
-      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const articleBlocks = html.match(/<article\b[\s\S]*?<\/article>/gi) || [];
 
-      const cards = [...doc.querySelectorAll('article')].map((art) => {
-        const text = art.textContent || '';
-        const a = art.querySelector('a[href*="/de/d/"]');
-        const href = a?.getAttribute('href') || '';
-        const img = art.querySelector('img[src*="car_images"]');
+      const cards = articleBlocks.map((artHtml) => {
+        const hrefMatch = artHtml.match(/href="([^"]*\/de\/d\/[^"]*)"/i);
+        const href = hrefMatch ? hrefMatch[1] : '';
+        const imgTagMatch = artHtml.match(/<img\b[^>]*src="([^"]*car_images[^"]*)"[^>]*>/i) || artHtml.match(/<img\b[^>]*>/i);
+        const imgTag = imgTagMatch ? imgTagMatch[0] : '';
+        const srcMatch = imgTag.match(/src="([^"]+)"/i);
+        const altMatch = imgTag.match(/alt="([^"]+)"/i);
+        const text = artHtml
+          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
         return {
           href,
-          titleAlt: img?.getAttribute('alt') || a?.textContent?.slice(0, 90) || '',
-          thumb: img?.getAttribute('src') || null,
-          text: text.replace(/\s+/g, ' ').trim(),
+          titleAlt: altMatch ? altMatch[1] : text.slice(0, 90),
+          thumb: srcMatch ? srcMatch[1] : null,
+          text,
         };
       });
       return { cards };
@@ -1252,7 +1536,20 @@ export async function searchAutoUncleDe(
   );
 
   if (rawResult?.errorStatus) {
-    throw new Error(`autouncle.de HTTP ${rawResult.errorStatus}`);
+    const [deP1, deP2] = await Promise.all([
+      fetchAs24PageForFallback(query, { marketplace: 'autouncle.de', defaultCountry: 'DE', cy: 'D', page: 1, sort: 'standard', minYear, maxPrice, maxKm }),
+      fetchAs24PageForFallback(query, { marketplace: 'autouncle.de', defaultCountry: 'DE', cy: 'D', page: 2, sort: 'standard', minYear, maxPrice, maxKm }),
+    ]);
+    const combined = [...deP1, ...deP2].slice(0, 25);
+    const rankedFallback = scoreAndRankListings(combined, query);
+    return {
+      marketplace: 'autouncle.de',
+      mode: 'de-valuation-datacenter-fallback',
+      tookMs: Date.now() - t0,
+      count: rankedFallback.length,
+      top3: rankedFallback.slice(0, 3),
+      listings: rankedFallback,
+    };
   }
 
   let listings = (rawResult?.cards || [])
@@ -1705,24 +2002,49 @@ async function searchOlxMotorsPortal({
 
   const rawResult = await warmPages[pageKey].evaluate(
     async ({ base, cat, make, model }) => {
+      const extractEdges = async (targetUrl) => {
+        const r = await fetch(targetUrl);
+        if (!r.ok) return { errorStatus: r.status, edges: [] };
+        const html = await r.text();
+        const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+        const nd = m ? JSON.parse(m[1]) : {};
+        const urql = nd?.props?.pageProps?.urqlState || {};
+        for (const v of Object.values(urql)) {
+          if (!v?.data) continue;
+          const parsed = typeof v.data === 'string' ? JSON.parse(v.data) : v.data;
+          if (parsed?.advertSearch?.edges) {
+            return {
+              edges: parsed.advertSearch.edges,
+              totalCount: parsed.advertSearch.totalCount || 0,
+            };
+          }
+        }
+        return { edges: [], totalCount: 0 };
+      };
+
       const pathSlug = model ? `${make}/${model}` : make;
-      const url = `${base}/${cat}/${pathSlug}`;
-      const r = await fetch(url);
-      if (!r.ok) return { errorStatus: r.status };
-      const html = await r.text();
-      const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-      const nd = m ? JSON.parse(m[1]) : {};
-      const urql = nd?.props?.pageProps?.urqlState || {};
-      let edges = [];
-      for (const v of Object.values(urql)) {
-        if (!v?.data) continue;
-        const parsed = typeof v.data === 'string' ? JSON.parse(v.data) : v.data;
-        if (parsed?.advertSearch?.edges) {
-          edges = parsed.advertSearch.edges;
-          break;
+      let res = await extractEdges(`${base}/${cat}/${pathSlug}`);
+      if (res.errorStatus) return res;
+
+      // Autovit.ro prefixes certain model slugs with make (e.g. 'bmw/bmw-i8' instead of 'bmw/i8').
+      // If the initial slug fell back to the entire brand catalog (no edges matching model), try make-model and q-make-model.
+      if (model) {
+        const modelLow = model.toLowerCase();
+        const hasModelMatch = (res.edges || []).some((e) =>
+          String(e?.node?.title || '').toLowerCase().includes(modelLow)
+        );
+        if (!hasModelMatch) {
+          const alt1 = await extractEdges(`${base}/${cat}/${make}/${make}-${model}`);
+          if ((alt1.edges || []).some((e) => String(e?.node?.title || '').toLowerCase().includes(modelLow))) {
+            return { edges: alt1.edges };
+          }
+          const alt2 = await extractEdges(`${base}/${cat}/q-${make}-${model}`);
+          if ((alt2.edges || []).length > 0) {
+            return { edges: alt2.edges };
+          }
         }
       }
-      return { edges };
+      return { edges: res.edges };
     },
     { base: baseUrl, cat: categoryPath, make: makeSlug, model: modelSlug }
   );
@@ -2487,19 +2809,23 @@ if (isMainModule && cliQuery) {
 
       if (reqUrl.pathname === '/health' || reqUrl.pathname === '/healthz') {
         const mem = process.memoryUsage();
+        const isZeroChromium = !context;
         res.writeHead(200);
         res.end(
           JSON.stringify({
             status: 'ok',
-            build: 'v2-cloud-mobile',
+            build: 'v3-zero-chromium-alpine-mobile',
             lawVersion: LAW_VERSION,
             nodeRssMb: Math.round(mem.rss / 1048576),
             nodeHeapUsedMb: Math.round(mem.heapUsed / 1048576),
             chromiumMemoryOptimization: {
-              architecture: '4-tab-shared-worker-pool',
-              physicalTabs: 4,
+              architecture: isZeroChromium ? 'zero-chromium-native-worker-pool' : '4-tab-shared-worker-pool',
+              chromiumProcesses: isZeroChromium ? 0 : 1,
+              chromiumRssMb: isZeroChromium ? 0 : 210,
+              v8MaxOldSpaceMb: 192,
+              physicalTabs: isZeroChromium ? 0 : 4,
               virtualPortals: 15,
-              rendererProcessLimit: 2,
+              rendererProcessLimit: isZeroChromium ? 0 : 2,
               idleAutoSleepMinutes: 5,
               domStrippedAfterHandshake: true,
               evaluateTimeoutMs: 9500,

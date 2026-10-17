@@ -125,7 +125,7 @@
 
     @media (min-width: 760px) {
       .page-shell {
-        grid-template-columns: 268px minmax(0, 1fr);
+        grid-template-columns: 286px minmax(0, 1fr);
         align-items: start;
       }
     }
@@ -197,25 +197,27 @@
 
     .brand-sub {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 400;
       color: var(--fg-muted);
       padding-left: 6px;
       border-left: 1px solid var(--border-input);
+      white-space: nowrap;
     }
 
     .autosave-pill {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 10.5px;
       color: var(--fg-secondary);
       background: #FFFFFF;
       border: 1px solid var(--border);
-      padding: 3px 8px;
+      padding: 3px 7px;
       border-radius: var(--radius-xs);
       white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .autosave-dot {
@@ -229,13 +231,14 @@
     /* 3-Mode Segmented Switcher (Matches spitogatos argon & PII) */
     .mode-switch-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 5px;
     }
 
     .mode-pill {
       height: 32px;
-      padding: 0 8px;
+      padding: 0 5px;
+      min-width: 0;
       border-radius: var(--radius-sm);
       border: 1px solid var(--border-input);
       background: #FFFFFF;
@@ -243,8 +246,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 5px;
-      font-size: 11.5px;
+      gap: 4px;
+      font-size: 11px;
       font-weight: 500;
       color: var(--fg-secondary);
       white-space: nowrap;
@@ -738,16 +741,16 @@
       line-height: 1.3;
     }
 
-    /* Single-Row Scrollable Portal Filter Tape */
+    /* Wrapped Multi-Row Portal Filter Tape (Zero Right-Edge Cropping) */
     .portal-tape {
       display: flex;
-      gap: 5px;
-      overflow-x: auto;
-      white-space: nowrap;
+      flex-wrap: wrap;
+      gap: 6px;
+      overflow-x: visible;
+      white-space: normal;
       margin-bottom: 14px;
-      padding-bottom: 8px;
+      padding-bottom: 10px;
       border-bottom: 1px solid var(--border);
-      scrollbar-width: thin;
     }
 
     .portal-pill {
@@ -993,11 +996,11 @@
       font-weight: 600;
       letter-spacing: -0.01em;
       color: var(--fg);
-      line-height: 1.3;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      line-height: 1.32;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      overflow: visible;
     }
 
     .vehicle-spec-line {
@@ -1794,13 +1797,11 @@
 
       .chip-grid {
         display: flex !important;
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        gap: 5px;
+        flex-wrap: wrap !important;
+        overflow-x: visible;
+        gap: 6px;
         padding-bottom: 2px;
         max-width: 100%;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
       }
 
       .chip-grid::-webkit-scrollbar {
@@ -1808,7 +1809,7 @@
       }
 
       .preset-btn {
-        flex: 0 0 auto;
+        flex: 0 1 auto;
         padding: 5px 10px;
         font-size: 11px;
       }
@@ -1819,22 +1820,23 @@
       }
 
       .sidebar-tool-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 5px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
       }
 
       .btn-desk {
-        height: 30px;
-        font-size: 10.5px;
-        padding: 0 4px;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        height: 34px;
+        font-size: 11.5px;
+        padding: 0 8px;
+        white-space: nowrap;
+        overflow: visible;
+        text-overflow: clip;
       }
 
       /* Stage Container & Top Bar on Mobile */
       .stage-column {
-        padding: 10px 12px 28px !important;
-        gap: 8px !important;
+        padding: 12px 12px 28px !important;
+        gap: 10px !important;
         min-width: 0;
         max-width: 100vw;
       }
@@ -1842,26 +1844,24 @@
       .stage-top-bar {
         flex-direction: column;
         align-items: stretch;
-        gap: 6px;
+        gap: 8px;
         padding-bottom: 8px;
       }
 
       .stage-title {
         font-size: 15.5px;
-        line-height: 1.2;
+        line-height: 1.25;
       }
 
       .stage-sub {
-        font-size: 11px;
-        line-height: 1.3;
+        font-size: 11.5px;
+        line-height: 1.35;
       }
 
       .quick-filter-row {
         display: flex;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        flex-wrap: wrap !important;
+        overflow-x: visible;
         gap: 6px;
         padding-bottom: 2px;
       }
@@ -1876,7 +1876,7 @@
       }
 
       .ledger-cell {
-        padding: 7px 10px !important;
+        padding: 9px 10px !important;
         min-width: 0;
       }
 
@@ -1891,10 +1891,11 @@
 
       .ledger-kicker {
         font-size: 9.5px;
-        margin-bottom: 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        margin-bottom: 3px;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.25;
       }
 
       .ledger-figure {
@@ -1902,11 +1903,13 @@
       }
 
       .ledger-meta {
-        font-size: 10px;
-        margin-top: 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 10.5px;
+        margin-top: 3px;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.32;
+        word-break: break-word;
       }
 
       /* Stream Progress Banner on Mobile */
@@ -1917,20 +1920,17 @@
       .stream-banner-top {
         flex-direction: column;
         align-items: flex-start;
-        gap: 3px;
+        gap: 4px;
         font-size: 11px;
       }
 
-      /* Single-Row Touch-Scrollable Portal Ribbon on Mobile */
+      /* Wrapped Multi-Row Portal Ribbon on Mobile (Zero Cropping) */
       .portal-tape {
-        flex-wrap: nowrap !important;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        padding-bottom: 4px;
-        margin: 0 -12px;
-        padding-left: 12px;
-        padding-right: 12px;
+        flex-wrap: wrap !important;
+        overflow-x: visible;
+        padding-bottom: 8px;
+        margin: 0;
+        gap: 5px;
       }
 
       .portal-tape::-webkit-scrollbar {
@@ -1938,15 +1938,15 @@
       }
 
       .portal-pill {
-        flex: 0 0 auto;
+        flex: 0 1 auto;
         height: 30px;
-        padding: 0 10px;
+        padding: 0 9px;
       }
 
       /* Full-Width Vehicle Cards with Uncropped 3-Column Metrics */
       .results-grid {
         grid-template-columns: 1fr !important;
-        gap: 12px;
+        gap: 14px;
       }
 
       .vehicle-card {
@@ -1955,16 +1955,20 @@
       }
 
       .media-frame {
-        height: 176px;
+        height: 184px;
       }
 
       .card-content {
-        padding: 12px;
-        gap: 9px;
+        padding: 13px;
+        gap: 10px;
       }
 
       .vehicle-title {
         font-size: 14px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        overflow: visible;
       }
 
       .prop-metrics-grid {
@@ -1972,7 +1976,7 @@
       }
 
       .pm-cell {
-        padding: 7px 6px;
+        padding: 8px 7px;
         min-width: 0;
       }
 
@@ -1982,10 +1986,13 @@
       }
 
       .pm-val {
-        font-size: 12px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 11.5px;
+        line-height: 1.25;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        word-break: keep-all;
+        overflow-wrap: break-word;
       }
 
       .card-actions {
@@ -2207,7 +2214,7 @@
           <a href="#" class="brand">
             <span class="brand-mark">A</span>
             <span>ARGON</span>
-            <span class="brand-sub">EU · 15 PORTALS &amp; CUSTOMS</span>
+            <span class="brand-sub">EU · CUSTOMS</span>
           </a>
           <div class="autosave-pill" role="status">
             <span class="autosave-dot"></span>
