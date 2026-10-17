@@ -114,7 +114,177 @@
     }
 
     /* ==========================================================================
-       MERCURY SPLIT APPLICATION SHELL (300px Left Rail + Borderless White Stage)
+       PASSWORD PROTECTION GATE (Institutional Mercury / ARGON Lock Screen)
+       ========================================================================== */
+    body.auth-locked {
+      overflow: hidden !important;
+      background: var(--bg-sidebar);
+    }
+
+    body.auth-locked .page-shell,
+    body.auth-locked .modal-backdrop {
+      display: none !important;
+    }
+
+    .auth-gate-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(59, 92, 204, 0.06), transparent 55%),
+        var(--bg-sidebar);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .auth-gate-overlay.hidden {
+      display: none !important;
+    }
+
+    .auth-gate-card {
+      width: 100%;
+      max-width: 400px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-popover);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .auth-gate-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .auth-gate-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      padding: 2px 7px;
+      border-radius: var(--radius-xs);
+      white-space: nowrap;
+    }
+
+    .auth-gate-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+      margin-bottom: 4px;
+    }
+
+    .auth-gate-desc {
+      font-size: 12.5px;
+      color: var(--fg-secondary);
+      line-height: 1.45;
+    }
+
+    .auth-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .auth-input-wrap input {
+      padding-right: 62px !important;
+      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
+    }
+
+    .auth-toggle-vis {
+      position: absolute;
+      right: 6px;
+      height: 24px;
+      padding: 0 8px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--fg-muted);
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+    }
+
+    .auth-toggle-vis:hover {
+      color: var(--fg);
+      border-color: var(--border-hover);
+    }
+
+    .auth-error-banner {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--danger);
+      background: var(--danger-soft);
+      border: 1px solid var(--danger-border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      line-height: 1.35;
+    }
+
+    .auth-error-banner.visible {
+      display: block;
+    }
+
+    .auth-gate-footer {
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--fg-muted);
+    }
+
+    .brand-status-cluster {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .btn-lock-pill {
+      height: 22px;
+      padding: 0 7px;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--border);
+      background: #FFFFFF;
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all var(--dur-fast) ease;
+    }
+
+    .btn-lock-pill:hover {
+      border-color: var(--border-hover);
+      color: var(--fg);
+      background: var(--bg-hover);
+    }
+
+    /* ==========================================================================
+       MERCURY SPLIT APPLICATION SHELL (304px Left Rail + Borderless White Stage)
        ========================================================================== */
     .page-shell {
       display: grid;
@@ -125,7 +295,7 @@
 
     @media (min-width: 760px) {
       .page-shell {
-        grid-template-columns: 286px minmax(0, 1fr);
+        grid-template-columns: 304px minmax(0, 1fr);
         align-items: start;
       }
     }
@@ -166,6 +336,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 6px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--border);
     }
@@ -173,17 +344,18 @@
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       text-decoration: none;
       color: var(--fg);
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13.5px;
       letter-spacing: -0.02em;
+      min-width: 0;
     }
 
     .brand-mark {
-      width: 22px;
-      height: 22px;
+      width: 21px;
+      height: 21px;
       border-radius: 5px;
       background: var(--fg);
       color: #FFFFFF;
@@ -193,11 +365,12 @@
       font-family: var(--font-mono);
       font-size: 11px;
       font-weight: 600;
+      flex-shrink: 0;
     }
 
     .brand-sub {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 9.5px;
       font-weight: 400;
       color: var(--fg-muted);
       padding-left: 6px;
@@ -210,11 +383,11 @@
       align-items: center;
       gap: 5px;
       font-family: var(--font-mono);
-      font-size: 10.5px;
+      font-size: 10px;
       color: var(--fg-secondary);
       background: #FFFFFF;
       border: 1px solid var(--border);
-      padding: 3px 7px;
+      padding: 2px 6px;
       border-radius: var(--radius-xs);
       white-space: nowrap;
       flex-shrink: 0;
@@ -343,8 +516,8 @@
     .prop-metrics-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      padding: 8px 10px;
+      gap: 0;
+      padding: 9px 10px;
       background: var(--bg-subtle);
       border: 1px solid var(--border);
       border-radius: var(--radius-xs);
@@ -354,7 +527,18 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
+      padding: 0 8px;
+      border-right: 1px solid var(--border);
+    }
+
+    .pm-cell:first-child {
+      padding-left: 2px;
+    }
+
+    .pm-cell:last-child {
+      border-right: none;
+      padding-right: 2px;
     }
 
     .pm-label {
@@ -362,7 +546,9 @@
       font-size: 9.5px;
       font-weight: 500;
       color: var(--fg-muted);
-      white-space: normal;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       line-height: 1.2;
       letter-spacing: 0.02em;
     }
@@ -370,13 +556,16 @@
     .pm-val {
       font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
       color: var(--fg);
       white-space: normal;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-      line-height: 1.25;
+      line-height: 1.3;
+    }
+
+    .nowrap-num {
+      white-space: nowrap;
+      display: inline-block;
     }
 
     .pm-val.positive {
@@ -497,6 +686,7 @@
 
     input[type="text"],
     input[type="number"],
+    input[type="password"],
     select {
       width: 100%;
       height: 35px;
@@ -510,6 +700,13 @@
       border-radius: var(--radius-sm);
       outline: none;
       transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+    }
+
+    select {
+      padding-right: 26px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
     }
 
     input::placeholder {
@@ -694,26 +891,31 @@
     /* Clean 4-Column KPI Ribbon */
     .ledger-bar {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       border: 1px solid var(--border);
       background: var(--bg-subtle);
       margin: 0 0 12px;
       border-radius: var(--radius-md);
-    }
-
-    @media (max-width: 720px) {
-      .ledger-bar { grid-template-columns: 1fr 1fr; }
+      overflow: hidden;
     }
 
     .ledger-cell {
-      padding: 10px 14px;
+      padding: 11px 15px;
       border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       gap: 2px;
+      min-width: 0;
     }
 
     .ledger-cell:last-child { border-right: none; }
+
+    @media (max-width: 980px) {
+      .ledger-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ledger-cell:nth-child(2) { border-right: none; }
+      .ledger-cell:nth-child(1),
+      .ledger-cell:nth-child(2) { border-bottom: 1px solid var(--border); }
+    }
 
     .ledger-kicker {
       font-family: var(--font-mono);
@@ -951,6 +1153,10 @@
       position: absolute;
       top: 8px;
       left: 8px;
+      max-width: calc(100% - 108px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       font-family: var(--font-mono);
       font-size: 10px;
       font-weight: 500;
@@ -962,33 +1168,38 @@
       border: 1px solid var(--border);
       padding: 2px 7px;
       border-radius: var(--radius-xs);
+      z-index: 2;
     }
 
     .tag-score {
       position: absolute;
       top: 8px;
       right: 8px;
+      white-space: nowrap;
       font-family: var(--font-mono);
       font-size: 10px;
       font-weight: 500;
-      background: rgba(20, 21, 26, 0.84);
+      background: rgba(20, 21, 26, 0.86);
       color: #FFFFFF;
       padding: 2px 7px;
       border-radius: var(--radius-xs);
+      z-index: 2;
     }
 
     .card-content {
-      padding: 13px 14px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
       gap: 10px;
       flex: 1;
+      min-width: 0;
     }
 
     .card-header-row {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 4px;
+      min-height: 40px;
     }
 
     .vehicle-title {
@@ -1250,7 +1461,7 @@
 
     .dossier-summary-strip {
       display: grid;
-      grid-template-columns: 1.4fr 1.2fr 1fr 1fr 1.2fr;
+      grid-template-columns: 1.25fr 1.15fr 1fr 1.35fr;
       background: var(--bg-subtle);
       border-bottom: 1px solid var(--border);
     }
@@ -1498,13 +1709,15 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
       font-size: 12px;
       color: var(--ink-700);
-      padding: 5px 8px;
+      padding: 6px 9px;
       border: 1px solid var(--border-hairline);
       border-radius: var(--radius-sm);
       cursor: pointer;
       user-select: none;
+      min-width: 0;
     }
 
     .option-check-label:hover {
@@ -1516,18 +1729,23 @@
       display: flex;
       align-items: center;
       gap: 7px;
+      min-width: 0;
+      flex: 1;
     }
 
     .option-check-left input {
       width: 14px;
       height: 14px;
       margin: 0;
+      flex-shrink: 0;
     }
 
     .option-price-tag {
       font-family: var(--font-mono);
       font-size: 10.5px;
       color: var(--ink-500);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     /* 3-Column Statutory Range Table (Low / Mid / High) */
@@ -1558,6 +1776,7 @@
     .statutory-table td.num, .statutory-table th.num {
       text-align: right;
       font-family: var(--font-mono);
+      white-space: nowrap;
     }
 
     .statutory-table tr.row-highlight {
@@ -1587,9 +1806,12 @@
        ============================================================================ */
     .dossier-vin-bar-grid {
       display: grid;
-      grid-template-columns: 1.2fr 0.7fr 1.5fr auto;
+      grid-template-columns: 1.15fr 0.75fr 1.3fr 1fr;
       gap: 8px;
       align-items: center;
+    }
+    .dossier-vin-bar-grid > * {
+      min-width: 0;
     }
 
     .dossier-overrides-grid {
@@ -2203,7 +2425,63 @@
     }
   </style>
 </head>
-<body>
+<body class="auth-locked">
+  <!-- INSTITUTIONAL PASSWORD GATE OVERLAY (Password: jake123) -->
+  <div id="authGateOverlay" class="auth-gate-overlay" role="dialog" aria-modal="true" aria-labelledby="authGateTitle">
+    <div class="auth-gate-card">
+      <div class="auth-gate-header">
+        <div class="brand">
+          <span class="brand-mark">A</span>
+          <span>ARGON</span>
+          <span class="brand-sub">EU · CUSTOMS</span>
+        </div>
+        <span class="auth-gate-badge">PROTECTED ACCESS</span>
+      </div>
+
+      <div>
+        <h1 class="auth-gate-title" id="authGateTitle">Operator Workspace Gate</h1>
+        <p class="auth-gate-desc">
+          Enter the workspace access password to unlock 15 European vehicle portals, statutory Greek customs valuation (Law 5162/2024), and VIN forensic tools.
+        </p>
+      </div>
+
+      <form id="authGateForm" autocomplete="on" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="control-group">
+          <label class="control-label" for="authPasswordInput">
+            <span>Access Password</span>
+            <span class="control-hint">Required</span>
+          </label>
+          <div class="auth-input-wrap">
+            <input
+              id="authPasswordInput"
+              type="password"
+              placeholder="Enter access password..."
+              autocomplete="current-password"
+              required
+            />
+            <button type="button" id="authToggleVisibilityBtn" class="auth-toggle-vis" aria-label="Toggle password visibility">
+              SHOW
+            </button>
+          </div>
+        </div>
+
+        <div id="authErrorBox" class="auth-error-banner" role="alert">
+          Invalid access password. Please verify your operator credentials and try again.
+        </div>
+
+        <button type="submit" id="authSubmitBtn" class="btn-submit">
+          <span>Unlock Workspace</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      </form>
+
+      <div class="auth-gate-footer">
+        <span>15 EU PORTALS · AADE ICISnet</span>
+        <span>SESSION COOKIE · 30D</span>
+      </div>
+    </div>
+  </div>
+
   <!-- MERCURY SPLIT APPLICATION SHELL (Matches C:\Users\iakwv\Downloads\PII) -->
   <div class="page-shell">
 
@@ -2216,9 +2494,14 @@
             <span>ARGON</span>
             <span class="brand-sub">EU · CUSTOMS</span>
           </a>
-          <div class="autosave-pill" role="status">
-            <span class="autosave-dot"></span>
-            <span>15 Portals Live</span>
+          <div class="brand-status-cluster">
+            <div class="autosave-pill" role="status" title="15 European portals active">
+              <span class="autosave-dot"></span>
+              <span>15 Portals</span>
+            </div>
+            <button type="button" id="btnLockWorkspace" class="btn-lock-pill" title="Lock workspace session">
+              Lock
+            </button>
           </div>
         </div>
 
@@ -2747,6 +3030,12 @@
       return `${fmtEur(r.low)} – ${fmtEur(r.high)}`;
     }
 
+    function fmtRangeHtml(r) {
+      if (!r || typeof r.low !== 'number') return '—';
+      if (Math.abs(r.high - r.low) < 80) return `<span class="nowrap-num">${fmtEur(r.mid)}</span>`;
+      return `<span class="nowrap-num">${fmtEur(r.low)}</span> – <span class="nowrap-num">${fmtEur(r.high)}</span>`;
+    }
+
     let activeEventSource = null;
     let pendingPortalsSet = new Set();
     let quickFilters = { vinOnly: false, arbOnly: false, vatOnly: false, shortlistOnly: false };
@@ -2993,15 +3282,15 @@
               <div class="prop-metrics-grid" onclick="openDeepResearchForItem('${itemJson}')" style="cursor:pointer;">
                 <div class="pm-cell">
                   <div class="pm-label">${isGr ? 'GR ASKING' : showNetto ? 'NETTO B2B' : 'EU ASKING'}</div>
-                  <div class="pm-val">${euPriceStr}</div>
+                  <div class="pm-val"><span class="nowrap-num">${euPriceStr}</span></div>
                 </div>
                 <div class="pm-cell">
                   <div class="pm-label">GR CUSTOMS</div>
-                  <div class="pm-val">${isGr ? '€0' : isExact ? `+${fmtEur(exactRegTaxEur)}` : fmtRange(gi.regTaxRange)}</div>
+                  <div class="pm-val">${isGr ? '<span class="nowrap-num">€0</span>' : isExact ? `<span class="nowrap-num">+${fmtEur(exactRegTaxEur)}</span>` : fmtRangeHtml(gi.regTaxRange)}</div>
                 </div>
                 <div class="pm-cell">
                   <div class="pm-label">LANDED GR</div>
-                  <div class="pm-val ${isExact ? 'positive' : ''}">${isGr ? euPriceStr : (isExact || showNetto) ? fmtEur(exactLandedEur) : fmtRange(gi.landedRange)}</div>
+                  <div class="pm-val ${isExact ? 'positive' : ''}">${isGr ? `<span class="nowrap-num">${euPriceStr}</span>` : (isExact || showNetto) ? `<span class="nowrap-num">${fmtEur(exactLandedEur)}</span>` : fmtRangeHtml(gi.landedRange)}</div>
                 </div>
               </div>
 
@@ -4797,7 +5086,112 @@
       });
     }
 
-    runSearch();
+    // --- Workspace Password Protection Gate (Password: jake123) ---
+    const authGateOverlay = document.getElementById('authGateOverlay');
+    const authGateForm = document.getElementById('authGateForm');
+    const authPasswordInput = document.getElementById('authPasswordInput');
+    const authToggleVisibilityBtn = document.getElementById('authToggleVisibilityBtn');
+    const authErrorBox = document.getElementById('authErrorBox');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const btnLockWorkspace = document.getElementById('btnLockWorkspace');
+    let hasTriggeredInitialSearch = false;
+
+    function unlockWorkspaceUI() {
+      document.body.classList.remove('auth-locked');
+      if (authGateOverlay) authGateOverlay.classList.add('hidden');
+      if (authErrorBox) authErrorBox.classList.remove('visible');
+      if (!hasTriggeredInitialSearch) {
+        hasTriggeredInitialSearch = true;
+        runSearch();
+      }
+    }
+
+    function lockWorkspaceUI() {
+      if (activeEventSource) {
+        try { activeEventSource.close(); } catch {}
+        activeEventSource = null;
+      }
+      document.body.classList.add('auth-locked');
+      if (authGateOverlay) authGateOverlay.classList.remove('hidden');
+      if (authPasswordInput) {
+        authPasswordInput.value = '';
+        setTimeout(() => authPasswordInput.focus(), 40);
+      }
+    }
+
+    if (authToggleVisibilityBtn && authPasswordInput) {
+      authToggleVisibilityBtn.addEventListener('click', () => {
+        const isPass = authPasswordInput.type === 'password';
+        authPasswordInput.type = isPass ? 'text' : 'password';
+        authToggleVisibilityBtn.textContent = isPass ? 'HIDE' : 'SHOW';
+      });
+    }
+
+    if (authGateForm) {
+      authGateForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = (authPasswordInput?.value || '').trim();
+        if (!password) return;
+        if (authSubmitBtn) {
+          authSubmitBtn.disabled = true;
+          authSubmitBtn.innerHTML = '<span>Verifying…</span>';
+        }
+        if (authErrorBox) authErrorBox.classList.remove('visible');
+        try {
+          const r = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok && d.authenticated) {
+            try { sessionStorage.setItem('argon_unlocked_v1', '1'); } catch {}
+            unlockWorkspaceUI();
+          } else {
+            if (authErrorBox) {
+              authErrorBox.textContent = d.error || 'Invalid access password. Please verify and try again.';
+              authErrorBox.classList.add('visible');
+            }
+            if (authPasswordInput) {
+              authPasswordInput.select();
+              authPasswordInput.focus();
+            }
+          }
+        } catch (err) {
+          if (authErrorBox) {
+            authErrorBox.textContent = 'Network error verifying password. Please try again.';
+            authErrorBox.classList.add('visible');
+          }
+        } finally {
+          if (authSubmitBtn) {
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.innerHTML = '<span>Unlock Workspace</span><span aria-hidden="true">→</span>';
+          }
+        }
+      });
+    }
+
+    if (btnLockWorkspace) {
+      btnLockWorkspace.addEventListener('click', async () => {
+        try { sessionStorage.removeItem('argon_unlocked_v1'); } catch {}
+        try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+        lockWorkspaceUI();
+      });
+    }
+
+    async function initWorkspaceAuth() {
+      try {
+        const r = await fetch('/api/auth/status', { cache: 'no-store' });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.authenticated) {
+          unlockWorkspaceUI();
+          return;
+        }
+      } catch {}
+      lockWorkspaceUI();
+    }
+
+    initWorkspaceAuth();
   </script>
 </body>
 </html>

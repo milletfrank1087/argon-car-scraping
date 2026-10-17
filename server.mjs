@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -26,6 +27,43 @@ let latestAggregatedListings = [];
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
+const PAGE_PASSWORD = String(process.env.ARGON_PASSWORD || 'jake123');
+const AUTH_COOKIE_NAME = 'argon_session';
+const AUTH_TOKEN = crypto
+  .createHmac('sha256', 'argon-customs-gate-v1')
+  .update(PAGE_PASSWORD)
+  .digest('hex');
+
+function verifyPasswordCandidate(candidate) {
+  if (typeof candidate !== 'string') return false;
+  const a = Buffer.from(candidate.trim(), 'utf8');
+  const b = Buffer.from(PAGE_PASSWORD, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function parseCookies(cookieHeader) {
+  const out = {};
+  if (!cookieHeader || typeof cookieHeader !== 'string') return out;
+  for (const part of cookieHeader.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx <= 0) continue;
+    const k = part.slice(0, idx).trim();
+    const v = part.slice(idx + 1).trim();
+    out[k] = decodeURIComponent(v);
+  }
+  return out;
+}
+
+function isAuthenticatedRequest(req, reqUrl) {
+  const cookies = parseCookies(req.headers?.cookie || '');
+  if (cookies[AUTH_COOKIE_NAME] === AUTH_TOKEN) return true;
+  const headerPass = req.headers?.['x-argon-password'];
+  if (typeof headerPass === 'string' && verifyPasswordCandidate(headerPass)) return true;
+  const queryPass = reqUrl?.searchParams?.get('pass') || reqUrl?.searchParams?.get('password');
+  if (typeof queryPass === 'string' && verifyPasswordCandidate(queryPass)) return true;
+  return false;
+}
 
 const CZK_PER_EUR = 25.25;
 const PLN_PER_EUR = 4.28;
@@ -2786,7 +2824,7 @@ if (isMainModule && cliQuery) {
     const reqUrl = new URL(req.url, `http://localhost:${PORT}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Argon-Password');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -2846,6 +2884,86 @@ if (isMainModule && cliQuery) {
           })
         );
         return;
+      }
+
+      // --- Password Authentication Endpoints (Password: jake123) ---
+      if (reqUrl.pathname === '/api/auth/status') {
+        res.setHeader('Cache-Control', 'no-store');
+        res.writeHead(200);
+        res.end(
+          JSON.stringify({
+            ok: true,
+            authenticated: isAuthenticatedRequest(req, reqUrl),
+          })
+        );
+        return;
+      }
+
+      if (reqUrl.pathname === '/api/auth/login') {
+        let submittedPassword = reqUrl.searchParams.get('password') || '';
+        if (req.method === 'POST') {
+          const chunks = [];
+          for await (const chunk of req) chunks.push(chunk);
+          const rawBody = Buffer.concat(chunks).toString('utf8');
+          try {
+            const parsed = rawBody ? JSON.parse(rawBody) : {};
+            if (typeof parsed.password === 'string') {
+              submittedPassword = parsed.password;
+            }
+          } catch {
+            // Ignore malformed JSON
+          }
+        }
+
+        res.setHeader('Cache-Control', 'no-store');
+        if (verifyPasswordCandidate(submittedPassword)) {
+          res.setHeader(
+            'Set-Cookie',
+            `${AUTH_COOKIE_NAME}=${AUTH_TOKEN}; Path=/; Max-Age=2592000; SameSite=Lax; HttpOnly`
+          );
+          res.writeHead(200);
+          res.end(JSON.stringify({ ok: true, authenticated: true }));
+        } else {
+          res.writeHead(401);
+          res.end(
+            JSON.stringify({
+              ok: false,
+              authenticated: false,
+              error: 'Invalid access password.',
+            })
+          );
+        }
+        return;
+      }
+
+      if (reqUrl.pathname === '/api/auth/logout') {
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader(
+          'Set-Cookie',
+          `${AUTH_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly`
+        );
+        res.writeHead(200);
+        res.end(JSON.stringify({ ok: true, authenticated: false }));
+        return;
+      }
+
+      if (
+        reqUrl.pathname.startsWith('/api/') ||
+        reqUrl.pathname === '/search' ||
+        reqUrl.pathname === '/search-stream'
+      ) {
+        if (!isAuthenticatedRequest(req, reqUrl)) {
+          res.setHeader('Cache-Control', 'no-store');
+          res.writeHead(401);
+          res.end(
+            JSON.stringify({
+              ok: false,
+              requiresAuth: true,
+              error: 'Authentication required. Please unlock the workspace first.',
+            })
+          );
+          return;
+        }
       }
 
       if (reqUrl.pathname === '/api/decode-vin') {
