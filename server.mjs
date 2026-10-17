@@ -408,9 +408,9 @@ export async function ensureWarmSessions(forceRestart = false) {
     ];
 
     // Cloud Memory Optimization flags for multi-tab Chromium:
-    // - Shares up to 4 renderer processes across all 15 marketplace tabs (--renderer-process-limit=4 + --disable-site-isolation-trials)
-    // - Caps per-renderer V8 heap (--js-flags=--max-old-space-size=256)
+    // - Shares up to 6 renderer processes across all 15 marketplace tabs (--renderer-process-limit=6 + --disable-site-isolation-trials)
     // - Disables background networking, extensions, GPU, and audio buffers
+    // - Strips DOM & stops background SPA timers after initial origin/cookie handshake
     const memoryOptimizedArgs = [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
@@ -418,9 +418,8 @@ export async function ensureWarmSessions(forceRestart = false) {
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--disable-software-rasterizer',
-      '--renderer-process-limit=4',
+      '--renderer-process-limit=6',
       '--disable-site-isolation-trials',
-      '--js-flags=--max-old-space-size=256',
       '--disable-extensions',
       '--disable-background-networking',
       '--disable-background-timer-throttling',
@@ -464,9 +463,17 @@ export async function ensureWarmSessions(forceRestart = false) {
       serviceWorkers: 'block',
     });
 
-    // Block heavy binary assets (images, video/audio, fonts) and third-party ad/telemetry trackers
+    // Block heavy binary assets (images, video/audio, fonts, stylesheets, websockets) and third-party trackers
     // across all 15 tabs. DOM <img> src attributes and JSON __NEXT_DATA__ thumbnails remain 100% intact!
-    const BLOCKED_RESOURCE_TYPES = new Set(['image', 'media', 'font']);
+    const BLOCKED_RESOURCE_TYPES = new Set([
+      'image',
+      'media',
+      'font',
+      'stylesheet',
+      'websocket',
+      'eventsource',
+      'manifest',
+    ]);
     const BLOCKED_TRACKER_RE = /(?:doubleclick\.net|googlesyndication\.com|google-analytics\.com|googletagmanager\.com|connect\.facebook\.net|criteo\.com|hotjar\.com|taboola\.com|outbrain\.com|adsystem\.com|adnxs\.com)/i;
     await context.route('**/*', (route) => {
       const req = route.request();
@@ -476,18 +483,78 @@ export async function ensureWarmSessions(forceRestart = false) {
       return route.continue();
     });
 
+    let extractedAs24BuildId = null;
+    let extractedMobMakes = [];
+
     const warmTask = async (key, url) => {
       const s0 = Date.now();
       const page = await context.newPage();
+      const origEvaluate = page.evaluate.bind(page);
+      page.evaluate = (fn, arg) =>
+        Promise.race([
+          origEvaluate(fn, arg),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Tab ${key} evaluate timeout`)), 9500)
+          ),
+        ]);
+      warmPages[key] = page;
       try {
         const resp = await page.goto(url, {
           waitUntil: 'domcontentloaded',
-          timeout: 25000,
+          timeout: isCloudLinux ? 10000 : 18000,
         });
-        warmPages[key] = page;
+
+        if (key === 'autoscout24') {
+          extractedAs24BuildId = await page
+            .evaluate(() => {
+              try {
+                return JSON.parse(document.getElementById('__NEXT_DATA__')?.textContent || '{}').buildId;
+              } catch {
+                return null;
+              }
+            })
+            .catch(() => null);
+        } else if (key === 'mobilede') {
+          const mobInit = await page
+            .evaluate(() => {
+              const q = String.fromCharCode(34);
+              const bs = String.fromCharCode(92);
+              const scripts = [...document.querySelectorAll('script')].map((s) => s.textContent).join('');
+              const idx = scripts.indexOf('Abarth');
+              let makes = [];
+              if (idx !== -1) {
+                try {
+                  const start = scripts.lastIndexOf('[', idx);
+                  const end = scripts.indexOf(']', idx) + 1;
+                  const raw = scripts.slice(start, end).split(bs + q).join(q);
+                  makes = JSON.parse(raw);
+                } catch {}
+              }
+              return { makes };
+            })
+            .catch(() => ({ makes: [] }));
+          extractedMobMakes = mobInit?.makes || [];
+        }
+
+        // Shed 90%+ of tab DOM & SPA timer memory once origin/cookies are established
+        await page
+          .evaluate(() => {
+            try {
+              window.stop();
+              const maxId = setTimeout(() => {}, 0);
+              for (let i = 1; i <= maxId; i++) {
+                clearTimeout(i);
+                clearInterval(i);
+              }
+              if (document.documentElement) {
+                document.documentElement.innerHTML = '<html><head></head><body>ok</body></html>';
+              }
+            } catch {}
+          })
+          .catch(() => {});
+
         return { key, status: resp?.status() || 200, ms: Date.now() - s0 };
       } catch (e) {
-        warmPages[key] = page;
         return { key, status: 'ERR', ms: Date.now() - s0, err: e.message };
       }
     };
@@ -510,8 +577,8 @@ export async function ensureWarmSessions(forceRestart = false) {
       ['coches', 'https://www.coches.com/coches-segunda-mano/bmw-i8.htm'],
     ];
 
-    // On cloud containers, stagger tab warm-up in batches of 4 to avoid CPU/RAM spikes
-    const warmConcurrency = isCloudLinux ? 4 : 8;
+    // On cloud containers, stagger tab warm-up in batches of 5 to avoid CPU/RAM spikes
+    const warmConcurrency = isCloudLinux ? 5 : 8;
     const results = [];
     for (let i = 0; i < warmTargets.length; i += warmConcurrency) {
       const batch = warmTargets.slice(i, i + warmConcurrency);
@@ -519,33 +586,9 @@ export async function ensureWarmSessions(forceRestart = false) {
       results.push(...batchRes);
     }
 
-    caches.as24BuildId = await warmPages.autoscout24.evaluate(() => {
-      try {
-        return JSON.parse(document.getElementById('__NEXT_DATA__')?.textContent || '{}').buildId;
-      } catch {
-        return null;
-      }
-    });
-
-    const mobInit = await warmPages.mobilede.evaluate(() => {
-      const q = String.fromCharCode(34);
-      const bs = String.fromCharCode(92);
-      const scripts = [...document.querySelectorAll('script')].map((s) => s.textContent).join('');
-      const idx = scripts.indexOf('Abarth');
-      let makes = [];
-      if (idx !== -1) {
-        try {
-          const start = scripts.lastIndexOf('[', idx);
-          const end = scripts.indexOf(']', idx) + 1;
-          const raw = scripts.slice(start, end).split(bs + q).join(q);
-          makes = JSON.parse(raw);
-        } catch {}
-      }
-      return { makes };
-    });
-
+    caches.as24BuildId = extractedAs24BuildId;
     caches.mobileMakes = new Map();
-    for (const m of mobInit.makes || []) {
+    for (const m of extractedMobMakes) {
       caches.mobileMakes.set(m.n.toLowerCase(), String(m.i));
     }
     const defaultMakes = {
@@ -2428,9 +2471,19 @@ if (isMainModule && cliQuery) {
             nodeRssMb: Math.round(mem.rss / 1048576),
             nodeHeapUsedMb: Math.round(mem.heapUsed / 1048576),
             chromiumMemoryOptimization: {
-              rendererProcessLimit: 4,
-              v8MaxOldSpaceMb: 256,
-              blockedResources: ['image', 'media', 'font', 'trackers'],
+              rendererProcessLimit: 6,
+              domStrippedAfterHandshake: true,
+              evaluateTimeoutMs: 9500,
+              blockedResources: [
+                'image',
+                'media',
+                'font',
+                'stylesheet',
+                'websocket',
+                'eventsource',
+                'manifest',
+                'trackers',
+              ],
             },
             warmTabs: Object.fromEntries(
               Object.entries(warmPages).map(([k, p]) => [k, Boolean(p && !p.isClosed())])
@@ -2674,8 +2727,10 @@ if (isMainModule && cliQuery) {
           'Content-Type': 'text/event-stream; charset=utf-8',
           'Cache-Control': 'no-cache, no-transform',
           Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no',
           'Access-Control-Allow-Origin': '*',
         });
+        res.flushHeaders?.();
 
         let clientClosed = false;
         req.on('close', () => {
@@ -2688,7 +2743,6 @@ if (isMainModule && cliQuery) {
         };
 
         const t0 = Date.now();
-        await ensureWarmSessions();
         const entries = getActiveMarketplaceTasks(q, { source, minYear, maxPrice, maxKm });
 
         sendEvent('init', {
@@ -2696,6 +2750,8 @@ if (isMainModule && cliQuery) {
           totalPortals: entries.length,
           portals: entries.map((e) => e.marketplace),
         });
+
+        await ensureWarmSessions();
 
         const resultsByMarket = new Map();
         const stage2DoneSet = new Set();
