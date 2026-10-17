@@ -372,10 +372,34 @@ export function scoreAndRankListings(listings, query = '') {
   return [...listings].sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0));
 }
 
+let idleBrowserTimer = null;
+const CLOUD_IDLE_SLEEP_MS = 5 * 60 * 1000;
+
+function touchBrowserIdleTimer() {
+  const isCloudLinux = process.platform === 'linux' && !process.env.DISPLAY;
+  if (!isCloudLinux) return;
+  if (idleBrowserTimer) clearTimeout(idleBrowserTimer);
+  idleBrowserTimer = setTimeout(async () => {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {}
+      browser = null;
+      context = null;
+      for (const k of Object.keys(warmPages)) warmPages[k] = null;
+      console.log('[WarmSessions] Closed idle Chromium instance to free cloud container RAM.');
+    }
+  }, CLOUD_IDLE_SLEEP_MS);
+  if (idleBrowserTimer.unref) idleBrowserTimer.unref();
+}
+
 /**
- * Boots a single off-screen Chrome instance and warms all 15 European marketplace tabs in parallel.
+ * Boots a single low-memory Chrome instance using a 4-Tab Shared Worker Pool:
+ * - 1 shared about:blank worker tab serves 12 European portals via --disable-web-security (zero navigation, zero SPA DOM)
+ * - 3 stripped origin tabs serve cookie-gated portals (cargr, theparking, mobilede)
  */
 export async function ensureWarmSessions(forceRestart = false) {
+  touchBrowserIdleTimer();
   const allReady = Object.values(warmPages).every((p) => p && !p.isClosed());
 
   if (allReady && !forceRestart) {
@@ -407,19 +431,20 @@ export async function ensureWarmSessions(forceRestart = false) {
       { channel: undefined, headless: true },
     ];
 
-    // Cloud Memory Optimization flags for multi-tab Chromium:
-    // - Shares up to 6 renderer processes across all 15 marketplace tabs (--renderer-process-limit=6 + --disable-site-isolation-trials)
-    // - Disables background networking, extensions, GPU, and audio buffers
-    // - Strips DOM & stops background SPA timers after initial origin/cookie handshake
+    // Ultra-Low-Memory Cloud Flags:
+    // - --disable-web-security allows 12 of 15 portals to run cross-origin fetch() from a single about:blank tab
+    // - --renderer-process-limit=2 caps total renderer OS processes across all 4 tabs to at most 2
     const memoryOptimizedArgs = [
       '--disable-blink-features=AutomationControlled',
+      '--disable-web-security',
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--disable-software-rasterizer',
-      '--renderer-process-limit=6',
+      '--renderer-process-limit=2',
       '--disable-site-isolation-trials',
+      '--disable-features=IsolateOrigins,site-per-process,TranslateUI,BlinkGenPropertyTrees',
       '--disable-extensions',
       '--disable-background-networking',
       '--disable-background-timer-throttling',
@@ -427,7 +452,6 @@ export async function ensureWarmSessions(forceRestart = false) {
       '--disable-breakpad',
       '--disable-component-extensions-with-background-pages',
       '--disable-default-apps',
-      '--disable-features=TranslateUI,BlinkGenPropertyTrees',
       '--disable-ipc-flooding-protection',
       '--disable-renderer-backgrounding',
       '--disable-sync',
@@ -460,11 +484,16 @@ export async function ensureWarmSessions(forceRestart = false) {
     context = await browser.newContext({
       locale: 'en-US',
       viewport: { width: 1280, height: 720 },
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
       serviceWorkers: 'block',
     });
 
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
+
     // Block heavy binary assets (images, video/audio, fonts, stylesheets, websockets) and third-party trackers
-    // across all 15 tabs. DOM <img> src attributes and JSON __NEXT_DATA__ thumbnails remain 100% intact!
     const BLOCKED_RESOURCE_TYPES = new Set([
       'image',
       'media',
@@ -483,38 +512,53 @@ export async function ensureWarmSessions(forceRestart = false) {
       return route.continue();
     });
 
-    let extractedAs24BuildId = null;
-    let extractedMobMakes = [];
-
-    const warmTask = async (key, url) => {
-      const s0 = Date.now();
-      const page = await context.newPage();
+    const wrapPageEvaluateTimeout = (page, label) => {
       const origEvaluate = page.evaluate.bind(page);
       page.evaluate = (fn, arg) =>
         Promise.race([
           origEvaluate(fn, arg),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Tab ${key} evaluate timeout`)), 9500)
+            setTimeout(() => reject(new Error(`Tab ${label} evaluate timeout`)), 9500)
           ),
         ]);
+      return page;
+    };
+
+    // 1. Create a SINGLE shared about:blank worker tab for all 12 CORS-free European portals!
+    const sharedWorkerPage = wrapPageEvaluateTimeout(await context.newPage(), 'shared-worker');
+    await sharedWorkerPage.goto('about:blank');
+
+    const sharedPortals = [
+      'autoscout24',
+      'autouncle',
+      'sautocz',
+      'willhaben',
+      'subito',
+      'otomoto',
+      'autovit',
+      'standvirtual',
+      'marktplaats',
+      'tweedehands',
+      'autobazar',
+      'coches',
+    ];
+    for (const key of sharedPortals) {
+      warmPages[key] = sharedWorkerPage;
+    }
+
+    // 2. Open only 3 origin-specific tabs for cookie-gated portals and strip their DOM immediately
+    let extractedMobMakes = [];
+    const warmOriginTask = async (key, url) => {
+      const s0 = Date.now();
+      const page = wrapPageEvaluateTimeout(await context.newPage(), key);
       warmPages[key] = page;
       try {
         const resp = await page.goto(url, {
           waitUntil: 'domcontentloaded',
-          timeout: isCloudLinux ? 10000 : 18000,
+          timeout: isCloudLinux ? 9000 : 15000,
         });
 
-        if (key === 'autoscout24') {
-          extractedAs24BuildId = await page
-            .evaluate(() => {
-              try {
-                return JSON.parse(document.getElementById('__NEXT_DATA__')?.textContent || '{}').buildId;
-              } catch {
-                return null;
-              }
-            })
-            .catch(() => null);
-        } else if (key === 'mobilede') {
+        if (key === 'mobilede') {
           const mobInit = await page
             .evaluate(() => {
               const q = String.fromCharCode(34);
@@ -559,34 +603,14 @@ export async function ensureWarmSessions(forceRestart = false) {
       }
     };
 
-    const warmTargets = [
+    const originTargets = [
       ['cargr', 'https://www.car.gr/used-cars/bmw/i8.html?category=15001&make=13687&model=15601'],
       ['theparking', 'https://www.theparking.eu/used-cars/bmw-i8.html'],
-      ['autoscout24', 'https://www.autoscout24.com/lst/bmw/i8'],
       ['mobilede', 'https://suchen.mobile.de/fahrzeuge/search.html?dam=false&isSearchRequest=true&ms=3500%3B%3B&s=Car&vc=Car'],
-      ['autouncle', 'https://www.autouncle.de/de/gebrauchtwagen/BMW/i8'],
-      ['sautocz', 'https://www.sauto.cz/api/v1/items/search?limit=1&offset=0&category_id=838'],
-      ['willhaben', 'https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?keyword=bmw+i8'],
-      ['subito', 'https://www.subito.it/annunci-italia/vendita/auto/?q=bmw+i8'],
-      ['otomoto', 'https://www.otomoto.pl/osobowe/bmw/i8'],
-      ['autovit', 'https://www.autovit.ro/autoturisme/bmw/i8'],
-      ['standvirtual', 'https://www.standvirtual.com/carros/bmw/i8'],
-      ['marktplaats', 'https://www.marktplaats.nl/l/auto-s/q/bmw+i8/'],
-      ['tweedehands', 'https://www.2dehands.be/l/auto-s/q/bmw+i8/'],
-      ['autobazar', 'https://www.autobazar.eu/vysledky/osobne-vozidla/bmw/i8/'],
-      ['coches', 'https://www.coches.com/coches-segunda-mano/bmw-i8.htm'],
     ];
 
-    // On cloud containers, stagger tab warm-up in batches of 5 to avoid CPU/RAM spikes
-    const warmConcurrency = isCloudLinux ? 5 : 8;
-    const results = [];
-    for (let i = 0; i < warmTargets.length; i += warmConcurrency) {
-      const batch = warmTargets.slice(i, i + warmConcurrency);
-      const batchRes = await Promise.all(batch.map(([k, u]) => warmTask(k, u)));
-      results.push(...batchRes);
-    }
+    const results = await Promise.all(originTargets.map(([k, u]) => warmOriginTask(k, u)));
 
-    caches.as24BuildId = extractedAs24BuildId;
     caches.mobileMakes = new Map();
     for (const m of extractedMobMakes) {
       caches.mobileMakes.set(m.n.toLowerCase(), String(m.i));
@@ -2472,7 +2496,11 @@ if (isMainModule && cliQuery) {
             nodeRssMb: Math.round(mem.rss / 1048576),
             nodeHeapUsedMb: Math.round(mem.heapUsed / 1048576),
             chromiumMemoryOptimization: {
-              rendererProcessLimit: 6,
+              architecture: '4-tab-shared-worker-pool',
+              physicalTabs: 4,
+              virtualPortals: 15,
+              rendererProcessLimit: 2,
+              idleAutoSleepMinutes: 5,
               domStrippedAfterHandshake: true,
               evaluateTimeoutMs: 9500,
               blockedResources: [
@@ -2837,8 +2865,13 @@ if (isMainModule && cliQuery) {
 
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`[Server] 15-Marketplace EU Dashboard & Greek Customs Calculator live at http://0.0.0.0:${PORT}`);
-    ensureWarmSessions().catch((err) => {
-      console.error('[WarmSessions] Initial warm-up error:', err.message);
-    });
+    const isCloudLinux = process.platform === 'linux' && !process.env.DISPLAY;
+    if (!isCloudLinux) {
+      ensureWarmSessions().catch((err) => {
+        console.error('[WarmSessions] Initial warm-up error:', err.message);
+      });
+    } else {
+      console.log('[WarmSessions] Cloud Linux detected — 4-tab Chromium worker pool will initialize on demand.');
+    }
   });
 }
