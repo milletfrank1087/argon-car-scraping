@@ -2467,6 +2467,7 @@ if (isMainModule && cliQuery) {
         res.end(
           JSON.stringify({
             status: 'ok',
+            build: 'v2-cloud-mobile',
             lawVersion: LAW_VERSION,
             nodeRssMb: Math.round(mem.rss / 1048576),
             nodeHeapUsedMb: Math.round(mem.heapUsed / 1048576),
