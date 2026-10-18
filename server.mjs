@@ -36,12 +36,63 @@ const AUTH_TOKEN = crypto
   .update(PAGE_PASSWORD)
   .digest('hex');
 
+const QUOTA_STORE_PATH = path.join(__dirname, '.quota-usage.json');
+const QUOTA_CODES = {
+  test5: {
+    code: 'test5',
+    maxScrapes: 5,
+    token: crypto.createHmac('sha256', 'argon-customs-gate-v1').update('quota:test5').digest('hex'),
+  },
+};
+
+function loadQuotaState() {
+  try {
+    if (fs.existsSync(QUOTA_STORE_PATH)) {
+      const raw = JSON.parse(fs.readFileSync(QUOTA_STORE_PATH, 'utf8'));
+      if (raw && typeof raw === 'object') return raw;
+    }
+  } catch {}
+  return { test5: { usedScrapes: 0, lastScrapeKey: '', lastScrapeAtMs: 0 } };
+}
+
+const quotaState = loadQuotaState();
+
+function saveQuotaState() {
+  try {
+    fs.writeFileSync(QUOTA_STORE_PATH, JSON.stringify(quotaState, null, 2), 'utf8');
+  } catch {}
+}
+
+function getQuotaSummary(codeKey) {
+  const cfg = QUOTA_CODES[codeKey];
+  if (!cfg) return null;
+  if (!quotaState[codeKey]) {
+    quotaState[codeKey] = { usedScrapes: 0, lastScrapeKey: '', lastScrapeAtMs: 0 };
+  }
+  const usedScrapes = Number(quotaState[codeKey].usedScrapes || 0);
+  const maxScrapes = cfg.maxScrapes;
+  const remainingScrapes = Math.max(0, maxScrapes - usedScrapes);
+  return {
+    code: cfg.code,
+    quotaLimited: true,
+    maxScrapes,
+    usedScrapes,
+    remainingScrapes,
+  };
+}
+
 function verifyPasswordCandidate(candidate) {
   if (typeof candidate !== 'string') return false;
   const a = Buffer.from(candidate.trim(), 'utf8');
   const b = Buffer.from(PAGE_PASSWORD, 'utf8');
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
+}
+
+function matchQuotaCodeCandidate(candidate) {
+  if (typeof candidate !== 'string') return null;
+  const normalized = candidate.trim().toLowerCase();
+  return QUOTA_CODES[normalized] || null;
 }
 
 function parseCookies(cookieHeader) {
@@ -57,14 +108,71 @@ function parseCookies(cookieHeader) {
   return out;
 }
 
-function isAuthenticatedRequest(req, reqUrl) {
+function resolveAuthSession(req, reqUrl) {
   const cookies = parseCookies(req.headers?.cookie || '');
-  if (cookies[AUTH_COOKIE_NAME] === AUTH_TOKEN) return true;
+  const cookieToken = cookies[AUTH_COOKIE_NAME];
+  if (cookieToken === AUTH_TOKEN) {
+    return { authenticated: true, role: 'master', code: 'master', quotaLimited: false, maxScrapes: null, usedScrapes: 0, remainingScrapes: null };
+  }
+  for (const [codeKey, cfg] of Object.entries(QUOTA_CODES)) {
+    if (cookieToken === cfg.token) {
+      return { authenticated: true, role: 'quota', ...getQuotaSummary(codeKey) };
+    }
+  }
+
   const headerPass = req.headers?.['x-argon-password'];
-  if (typeof headerPass === 'string' && verifyPasswordCandidate(headerPass)) return true;
   const queryPass = reqUrl?.searchParams?.get('pass') || reqUrl?.searchParams?.get('password');
-  if (typeof queryPass === 'string' && verifyPasswordCandidate(queryPass)) return true;
-  return false;
+  const candidate = typeof headerPass === 'string' ? headerPass : typeof queryPass === 'string' ? queryPass : null;
+  if (candidate) {
+    if (verifyPasswordCandidate(candidate)) {
+      return { authenticated: true, role: 'master', code: 'master', quotaLimited: false, maxScrapes: null, usedScrapes: 0, remainingScrapes: null };
+    }
+    const qCfg = matchQuotaCodeCandidate(candidate);
+    if (qCfg) {
+      return { authenticated: true, role: 'quota', ...getQuotaSummary(qCfg.code) };
+    }
+  }
+  return { authenticated: false, role: null, code: null, quotaLimited: false };
+}
+
+function isAuthenticatedRequest(req, reqUrl) {
+  return resolveAuthSession(req, reqUrl).authenticated;
+}
+
+function consumeScrapeQuota(authSession, scrapeKey = '') {
+  if (!authSession || !authSession.authenticated) {
+    return { allowed: false, error: 'Authentication required.' };
+  }
+  if (!authSession.quotaLimited || !authSession.code) {
+    return { allowed: true, quota: null };
+  }
+  const codeKey = authSession.code;
+  const cfg = QUOTA_CODES[codeKey];
+  if (!cfg) return { allowed: true, quota: null };
+  if (!quotaState[codeKey]) {
+    quotaState[codeKey] = { usedScrapes: 0, lastScrapeKey: '', lastScrapeAtMs: 0 };
+  }
+  const entry = quotaState[codeKey];
+  const now = Date.now();
+  // Deduplicate immediate fallback (/search-stream -> /search) within 4 seconds for the same query
+  if (scrapeKey && entry.lastScrapeKey === scrapeKey && now - (entry.lastScrapeAtMs || 0) < 4000) {
+    return { allowed: true, deduplicated: true, quota: getQuotaSummary(codeKey) };
+  }
+  if (entry.usedScrapes >= cfg.maxScrapes) {
+    return {
+      allowed: false,
+      quotaExceeded: true,
+      quota: getQuotaSummary(codeKey),
+      error: `Scrape limit reached for code '${cfg.code}' (${cfg.maxScrapes}/${cfg.maxScrapes} scrapes used).`,
+    };
+  }
+  entry.usedScrapes += 1;
+  entry.lastScrapeKey = scrapeKey;
+  entry.lastScrapeAtMs = now;
+  saveQuotaState();
+  const summary = getQuotaSummary(codeKey);
+  console.log(`[Quota] Code '${cfg.code}' used scrape ${summary.usedScrapes}/${summary.maxScrapes} (${summary.remainingScrapes} remaining)`);
+  return { allowed: true, quota: summary };
 }
 
 const CZK_PER_EUR = 25.25;
@@ -2894,16 +3002,37 @@ if (isMainModule && cliQuery) {
         return;
       }
 
-      // --- Password Authentication Endpoints (Password: jake123) ---
+      // --- Password & Quota Code Authentication Endpoints (Master: jake123 | Quota: test5 = 5 scrapes total) ---
       if (reqUrl.pathname === '/api/auth/status') {
+        const session = resolveAuthSession(req, reqUrl);
         res.setHeader('Cache-Control', 'no-store');
         res.writeHead(200);
         res.end(
           JSON.stringify({
             ok: true,
-            authenticated: isAuthenticatedRequest(req, reqUrl),
+            ...session,
           })
         );
+        return;
+      }
+
+      if (reqUrl.pathname === '/api/auth/reset-quota') {
+        const session = resolveAuthSession(req, reqUrl);
+        if (session.role !== 'master') {
+          res.writeHead(403);
+          res.end(JSON.stringify({ ok: false, error: 'Master operator password required to reset code quota.' }));
+          return;
+        }
+        const targetCode = (reqUrl.searchParams.get('code') || 'test5').trim().toLowerCase();
+        if (!QUOTA_CODES[targetCode]) {
+          res.writeHead(404);
+          res.end(JSON.stringify({ ok: false, error: `Unknown quota code '${targetCode}'.` }));
+          return;
+        }
+        quotaState[targetCode] = { usedScrapes: 0, lastScrapeKey: '', lastScrapeAtMs: 0 };
+        saveQuotaState();
+        res.writeHead(200);
+        res.end(JSON.stringify({ ok: true, reset: true, quota: getQuotaSummary(targetCode) }));
         return;
       }
 
@@ -2930,17 +3059,61 @@ if (isMainModule && cliQuery) {
             `${AUTH_COOKIE_NAME}=${AUTH_TOKEN}; Path=/; Max-Age=2592000; SameSite=Lax; HttpOnly`
           );
           res.writeHead(200);
-          res.end(JSON.stringify({ ok: true, authenticated: true }));
-        } else {
-          res.writeHead(401);
           res.end(
             JSON.stringify({
-              ok: false,
-              authenticated: false,
-              error: 'Invalid access password.',
+              ok: true,
+              authenticated: true,
+              role: 'master',
+              code: 'master',
+              quotaLimited: false,
+              maxScrapes: null,
+              usedScrapes: 0,
+              remainingScrapes: null,
             })
           );
+          return;
         }
+
+        const qCfg = matchQuotaCodeCandidate(submittedPassword);
+        if (qCfg) {
+          const summary = getQuotaSummary(qCfg.code);
+          if (summary.remainingScrapes <= 0) {
+            res.writeHead(403);
+            res.end(
+              JSON.stringify({
+                ok: false,
+                authenticated: false,
+                quotaExceeded: true,
+                ...summary,
+                error: `Access code '${qCfg.code}' has already used all ${summary.maxScrapes}/${summary.maxScrapes} scrapes in total.`,
+              })
+            );
+            return;
+          }
+          res.setHeader(
+            'Set-Cookie',
+            `${AUTH_COOKIE_NAME}=${qCfg.token}; Path=/; Max-Age=2592000; SameSite=Lax; HttpOnly`
+          );
+          res.writeHead(200);
+          res.end(
+            JSON.stringify({
+              ok: true,
+              authenticated: true,
+              role: 'quota',
+              ...summary,
+            })
+          );
+          return;
+        }
+
+        res.writeHead(401);
+        res.end(
+          JSON.stringify({
+            ok: false,
+            authenticated: false,
+            error: 'Invalid access password or code.',
+          })
+        );
         return;
       }
 
@@ -3146,9 +3319,23 @@ if (isMainModule && cliQuery) {
       }
 
       if (reqUrl.pathname === '/api/arbitrage-radar') {
+        const authSession = resolveAuthSession(req, reqUrl);
         const rawModels =
           reqUrl.searchParams.get('models') ||
           'bmw i8,porsche 911,audi a3 40 tfsi e,ford mustang';
+        const quotaCheck = consumeScrapeQuota(authSession, `radar:${rawModels}`);
+        if (!quotaCheck.allowed) {
+          res.writeHead(429);
+          res.end(
+            JSON.stringify({
+              ok: false,
+              quotaExceeded: true,
+              error: quotaCheck.error,
+              quota: quotaCheck.quota,
+            })
+          );
+          return;
+        }
         const models = rawModels
           .split(',')
           .map((s) => s.trim())
@@ -3213,6 +3400,7 @@ if (isMainModule && cliQuery) {
               modelsScanned: models,
               modelSummaries,
               topArbitrageDeals: allDeals.slice(0, 30),
+              quota: quotaCheck.quota,
             },
             null,
             2
@@ -3222,6 +3410,7 @@ if (isMainModule && cliQuery) {
       }
 
       if (reqUrl.pathname === '/search-stream') {
+        const authSession = resolveAuthSession(req, reqUrl);
         const q = reqUrl.searchParams.get('q') || 'bmw i8';
         const source = reqUrl.searchParams.get('source') || 'all';
         const minYear = reqUrl.searchParams.get('minYear') || '';
@@ -3247,6 +3436,19 @@ if (isMainModule && cliQuery) {
           res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
         };
 
+        const scrapeKey = `search:${q}:${source}:${minYear}:${maxPrice}:${maxKm}`;
+        const quotaCheck = consumeScrapeQuota(authSession, scrapeKey);
+        if (!quotaCheck.allowed) {
+          sendEvent('quota_exceeded', {
+            ok: false,
+            quotaExceeded: true,
+            error: quotaCheck.error,
+            quota: quotaCheck.quota,
+          });
+          if (!clientClosed) res.end();
+          return;
+        }
+
         const t0 = Date.now();
         const entries = getActiveMarketplaceTasks(q, { source, minYear, maxPrice, maxKm });
 
@@ -3254,6 +3456,7 @@ if (isMainModule && cliQuery) {
           query: q,
           totalPortals: entries.length,
           portals: entries.map((e) => e.marketplace),
+          quota: quotaCheck.quota,
         });
 
         await ensureWarmSessions();
@@ -3312,19 +3515,41 @@ if (isMainModule && cliQuery) {
         );
 
         const finalPayload = computeAggregatePayload(q, Array.from(resultsByMarket.values()), t0);
+        finalPayload.quota = quotaCheck.quota;
         sendEvent('complete', finalPayload);
         if (!clientClosed) res.end();
         return;
       }
 
       if (reqUrl.pathname === '/search') {
+        const authSession = resolveAuthSession(req, reqUrl);
         const q = reqUrl.searchParams.get('q') || 'bmw i8';
         const source = reqUrl.searchParams.get('source') || 'all';
         const minYear = reqUrl.searchParams.get('minYear') || '';
         const maxPrice = reqUrl.searchParams.get('maxPrice') || '';
         const maxKm = reqUrl.searchParams.get('maxKm') || '';
 
+        const scrapeKey = `search:${q}:${source}:${minYear}:${maxPrice}:${maxKm}`;
+        const quotaCheck = consumeScrapeQuota(authSession, scrapeKey);
+        if (!quotaCheck.allowed) {
+          res.writeHead(429);
+          res.end(
+            JSON.stringify(
+              {
+                ok: false,
+                quotaExceeded: true,
+                error: quotaCheck.error,
+                quota: quotaCheck.quota,
+              },
+              null,
+              2
+            )
+          );
+          return;
+        }
+
         const data = await searchAllMarketplaces(q, { source, minYear, maxPrice, maxKm });
+        data.quota = quotaCheck.quota;
         res.writeHead(200);
         res.end(JSON.stringify(data, null, 2));
         return;

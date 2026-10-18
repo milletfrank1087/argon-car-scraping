@@ -2623,14 +2623,14 @@
       <form id="authGateForm" autocomplete="on" style="display:flex;flex-direction:column;gap:12px;">
         <div class="control-group">
           <label class="control-label" for="authPasswordInput">
-            <span>Access Password</span>
+            <span>Access Password / Code</span>
             <span class="control-hint">Required</span>
           </label>
           <div class="auth-input-wrap">
             <input
               id="authPasswordInput"
               type="password"
-              placeholder="Enter access password..."
+              placeholder="Enter access password or code (e.g. test5)..."
               autocomplete="current-password"
               required
             />
@@ -2674,6 +2674,7 @@
               <span class="autosave-dot"></span>
               <span>15 Live</span>
             </div>
+            <span id="quotaStatusPill" class="btn-lock-pill" style="display:none;background:rgba(180,83,9,0.12);color:#92400e;border-color:rgba(180,83,9,0.35);font-weight:700;cursor:default;" title="Remaining scrapes on active access code"></span>
             <button type="button" id="btnLockWorkspace" class="btn-lock-pill" title="Lock workspace session">
               Lock
             </button>
@@ -3681,10 +3682,35 @@
       return new Promise((resolve) => {
         const es = new EventSource(`/search-stream?${sp.toString()}`);
         activeEventSource = es;
+        let quotaBlocked = false;
+
+        es.addEventListener('quota_exceeded', (ev) => {
+          quotaBlocked = true;
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg.quota && typeof window.updateQuotaPillUI === 'function') {
+              window.updateQuotaPillUI(msg.quota);
+            }
+            streamProgressFill.style.width = '100%';
+            streamStatusText.textContent = `⛔ ${msg.error || "Scrape limit reached for code 'test5' (5/5 scrapes used)."} Click 'Lock' to switch to an operator password.`;
+            streamVinCounter.textContent = `0/5 Scrapes Left`;
+          } catch {}
+          pendingPortalsSet.clear();
+          renderMarketPills();
+          renderListings();
+          es.close();
+          activeEventSource = null;
+          searchBtn.disabled = false;
+          searchBtn.textContent = 'Search 15 Portals';
+          resolve();
+        });
 
         es.addEventListener('init', (ev) => {
           try {
             const msg = JSON.parse(ev.data);
+            if (msg.quota && typeof window.updateQuotaPillUI === 'function') {
+              window.updateQuotaPillUI(msg.quota);
+            }
             pendingPortalsSet = new Set(msg.portals || ALL_15_PORTALS);
             renderMarketPills();
             renderListings();
@@ -3721,6 +3747,9 @@
         es.addEventListener('complete', (ev) => {
           try {
             const finalData = JSON.parse(ev.data);
+            if (finalData.quota && typeof window.updateQuotaPillUI === 'function') {
+              window.updateQuotaPillUI(finalData.quota);
+            }
             pendingPortalsSet.clear();
             currentData = finalData;
             streamProgressFill.style.width = '100%';
@@ -3747,12 +3776,27 @@
           es.close();
           activeEventSource = null;
           pendingPortalsSet.clear();
+          if (quotaBlocked) {
+            searchBtn.disabled = false;
+            searchBtn.textContent = 'Search 15 Portals';
+            resolve();
+            return;
+          }
           try {
             const r = await fetch(`/search?${sp.toString()}`);
-            currentData = await r.json();
-            updateSummaryKpis(currentData);
-            renderMarketPills();
-            renderListings();
+            const d = await r.json();
+            if (d.quota && typeof window.updateQuotaPillUI === 'function') {
+              window.updateQuotaPillUI(d.quota);
+            }
+            if (r.status === 429 || d.quotaExceeded) {
+              streamStatusText.textContent = `⛔ ${d.error || "Scrape limit reached for code 'test5' (5/5 scrapes used)."}`;
+              streamVinCounter.textContent = `0/5 Scrapes Left`;
+            } else {
+              currentData = d;
+              updateSummaryKpis(currentData);
+              renderMarketPills();
+              renderListings();
+            }
           } catch {}
           searchBtn.disabled = false;
           searchBtn.textContent = 'Search 15 Portals';
@@ -5630,6 +5674,9 @@
       try {
         const r = await fetch(`/api/arbitrage-radar?models=${encodeURIComponent(modelsRaw)}`);
         const d = await r.json();
+        if (d.quota && typeof window.updateQuotaPillUI === 'function') {
+          window.updateQuotaPillUI(d.quota);
+        }
         if (!d.ok) throw new Error(d.error || 'Failed to run radar');
 
         const summaryRows = (d.modelSummaries || []).map(m => `
@@ -5757,7 +5804,7 @@
       });
     }
 
-    // --- Workspace Password Protection Gate (Password: jake123) ---
+    // --- Workspace Password & Quota Code Protection Gate (Master: jake123 | Code: test5 = 5 scrapes total) ---
     const authGateOverlay = document.getElementById('authGateOverlay');
     const authGateForm = document.getElementById('authGateForm');
     const authPasswordInput = document.getElementById('authPasswordInput');
@@ -5765,15 +5812,54 @@
     const authErrorBox = document.getElementById('authErrorBox');
     const authSubmitBtn = document.getElementById('authSubmitBtn');
     const btnLockWorkspace = document.getElementById('btnLockWorkspace');
+    const quotaStatusPill = document.getElementById('quotaStatusPill');
     let hasTriggeredInitialSearch = false;
 
-    function unlockWorkspaceUI() {
+    window.updateQuotaPillUI = function(qData) {
+      if (!quotaStatusPill) return;
+      if (qData && qData.quotaLimited) {
+        const rem = Number(qData.remainingScrapes ?? 0);
+        const max = Number(qData.maxScrapes ?? 5);
+        const codeUp = String(qData.code || 'test5').toUpperCase();
+        quotaStatusPill.style.display = 'inline-flex';
+        quotaStatusPill.textContent = `${codeUp} · ${rem}/${max} LEFT`;
+        if (rem <= 0) {
+          quotaStatusPill.style.background = '#FEE2E2';
+          quotaStatusPill.style.color = '#991B1B';
+          quotaStatusPill.style.borderColor = '#991B1B';
+        } else {
+          quotaStatusPill.style.background = 'rgba(180,83,9,0.12)';
+          quotaStatusPill.style.color = '#92400e';
+          quotaStatusPill.style.borderColor = 'rgba(180,83,9,0.35)';
+        }
+      } else {
+        quotaStatusPill.style.display = 'none';
+      }
+    };
+
+    function unlockWorkspaceUI(authData = null) {
       document.body.classList.remove('auth-locked');
       if (authGateOverlay) authGateOverlay.classList.add('hidden');
       if (authErrorBox) authErrorBox.classList.remove('visible');
+      window.updateQuotaPillUI(authData);
       if (!hasTriggeredInitialSearch) {
         hasTriggeredInitialSearch = true;
-        runSearch();
+        if (authData && authData.quotaLimited) {
+          const streamBanner = document.getElementById('streamProgressBanner');
+          const streamStatusText = document.getElementById('streamStatusText');
+          const streamVinCounter = document.getElementById('streamVinCounter');
+          const streamProgressFill = document.getElementById('streamProgressFill');
+          if (streamBanner) streamBanner.classList.add('visible');
+          if (streamProgressFill) streamProgressFill.style.width = '100%';
+          if (streamStatusText) {
+            streamStatusText.textContent = `Access code '${String(authData.code || 'test5').toUpperCase()}' unlocked (${authData.remainingScrapes}/${authData.maxScrapes} scrapes available) — enter a vehicle model and click 'Search 15 Portals'.`;
+          }
+          if (streamVinCounter) {
+            streamVinCounter.textContent = `${authData.remainingScrapes}/${authData.maxScrapes} Scrapes Left`;
+          }
+        } else {
+          runSearch();
+        }
       }
     }
 
@@ -5782,6 +5868,7 @@
         try { activeEventSource.close(); } catch {}
         activeEventSource = null;
       }
+      window.updateQuotaPillUI(null);
       document.body.classList.add('auth-locked');
       if (authGateOverlay) authGateOverlay.classList.remove('hidden');
       if (authPasswordInput) {
@@ -5817,10 +5904,10 @@
           const d = await r.json().catch(() => ({}));
           if (r.ok && d.authenticated) {
             try { sessionStorage.setItem('argon_unlocked_v1', '1'); } catch {}
-            unlockWorkspaceUI();
+            unlockWorkspaceUI(d);
           } else {
             if (authErrorBox) {
-              authErrorBox.textContent = d.error || 'Invalid access password. Please verify and try again.';
+              authErrorBox.textContent = d.error || 'Invalid access password or code. Please verify and try again.';
               authErrorBox.classList.add('visible');
             }
             if (authPasswordInput) {
@@ -5846,6 +5933,7 @@
       btnLockWorkspace.addEventListener('click', async () => {
         try { sessionStorage.removeItem('argon_unlocked_v1'); } catch {}
         try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+        hasTriggeredInitialSearch = false;
         lockWorkspaceUI();
       });
     }
@@ -5855,7 +5943,7 @@
         const r = await fetch('/api/auth/status', { cache: 'no-store' });
         const d = await r.json().catch(() => ({}));
         if (r.ok && d.authenticated) {
-          unlockWorkspaceUI();
+          unlockWorkspaceUI(d);
           return;
         }
       } catch {}
