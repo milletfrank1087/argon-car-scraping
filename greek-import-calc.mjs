@@ -620,6 +620,93 @@ export const MODEL_PROFILES = [
     label: 'Ferrari Supercar Homologation Profile (>€30k 30% marginal scale)',
   },
   {
+    matchRe: /\blamborghini\b.*\bhurac[aá]n\b|\bhurac[aá]n\b|\b(lp\s*610|lp\s*580|lp\s*640|huracan\s*evo|huracan\s*sto|huracan\s*tecnica|huracan\s*sterrato|huracan\s*performante)\b/i,
+    roadsterRe: /spyder|spider|cabrio|roadster|aperta/i,
+    category: 'passenger',
+    fuel: 'petrol',
+    cc: 5204,
+    co2RangeByYear: (y, isSpyder, text) => {
+      if (/\bsto\b|\bsterrato\b|\btecnica\b/i.test(text)) {
+        return { low: 328, mid: 331, high: 338 };
+      }
+      if (/\bperformante\b/i.test(text)) {
+        return isSpyder ? { low: 314, mid: 320, high: 325 } : { low: 308, mid: 314, high: 320 };
+      }
+      if (y >= 2019 || /\bevo\b/i.test(text)) {
+        return isSpyder ? { low: 328, mid: 335, high: 338 } : { low: 322, mid: 332, high: 337 };
+      }
+      if (/580-?2|\brwd\b/i.test(text)) {
+        return isSpyder ? { low: 278, mid: 283, high: 288 } : { low: 275, mid: 278, high: 283 };
+      }
+      return isSpyder ? { low: 280, mid: 285, high: 290 } : { low: 278, mid: 280, high: 290 };
+    },
+    listPriceRangeByYear: (y, isSpyder, text) => {
+      let mid = 172000; // LP 610-4 Coupé pre-tax ΛΤΠΦ baseline
+      if (/\bsto\b/i.test(text)) mid = 256000;
+      else if (/\bsterrato\b/i.test(text)) mid = 224000;
+      else if (/\btecnica\b/i.test(text)) mid = 204000;
+      else if (/\bperformante\b/i.test(text)) mid = 198000;
+      else if (/\bevo\b/i.test(text)) {
+        mid = /rwd|580|2wd/i.test(text) ? 165000 : 188000;
+      } else if (/580-?2|\brwd\b/i.test(text)) {
+        mid = 154000;
+      } else if (y >= 2020) {
+        mid = 188000;
+      }
+      if (isSpyder && !/\bsto\b|\bsterrato\b|\btecnica\b/i.test(text)) {
+        mid += 17500;
+      }
+      return { low: Math.round(mid * 0.95), mid, high: Math.round(mid * 1.06) };
+    },
+    body: (isSpyder) => (isSpyder ? 'cabrio' : 'coupe'),
+    confidence: 'high',
+    label: 'Lamborghini Huracán 5.2 V10 (5,204 cc · 278–338 g/km CO₂ · >€30k 30% scale)',
+  },
+  {
+    matchRe: /\blamborghini\b.*\burus\b|\burus\b.*\b(performante|v8|bi-?turbo)\b/i,
+    category: 'passenger',
+    fuel: 'petrol',
+    cc: 3996,
+    co2RangeByYear: (_y, _isCab, text) => (/\bse\b|\bphev\b|\bhybrid\b/i.test(text) ? { low: 50, mid: 51, high: 60 } : { low: 292, mid: 320, high: 325 }),
+    listPriceRangeByYear: (_y, _isCab, text) => {
+      const mid = /performante|\bs\b|\bse\b/i.test(text) ? 208000 : 182000;
+      return { low: Math.round(mid * 0.95), mid, high: Math.round(mid * 1.06) };
+    },
+    body: () => 'suv',
+    confidence: 'high',
+    label: 'Lamborghini Urus 4.0 V8 BiTurbo SUV (3,996 cc)',
+  },
+  {
+    matchRe: /\blamborghini\b.*\baventador\b|\baventador\b.*\b(lp\s*7\d\d|svj|ultimae)\b/i,
+    roadsterRe: /roadster|spyder|spider/i,
+    category: 'passenger',
+    fuel: 'petrol',
+    cc: 6498,
+    co2RangeByYear: () => ({ low: 370, mid: 398, high: 452 }),
+    listPriceRangeByYear: (_y, isRoadster, text) => {
+      let mid = /svj|ultimae/i.test(text) ? 345000 : /\bsv\b/i.test(text) ? 310000 : 272000;
+      if (isRoadster) mid += 26000;
+      return { low: Math.round(mid * 0.95), mid, high: Math.round(mid * 1.06) };
+    },
+    body: (isRoadster) => (isRoadster ? 'cabrio' : 'coupe'),
+    confidence: 'high',
+    label: 'Lamborghini Aventador 6.5 V12 (6,498 cc)',
+  },
+  {
+    matchRe: /\b(tesla\s+model\s+[3ysx]|porsche\s+taycan|audi\s+(?:e-?tron\s+gt|q4\s+e-?tron|q8\s+e-?tron)|bmw\s+(?:i3|i4|ix|ix1|ix2|ix3|i5|i7)\b|mercedes(?:-benz)?\s+(?:eqa|eqb|eqc|eqe|eqs)\b|vw\s+id\.[3457]|volkswagen\s+id\.[3457]|hyundai\s+ioniq\s*[56]|kia\s+ev[369]|polestar\s+[234])\b/i,
+    category: 'passenger',
+    fuel: 'electric',
+    cc: 0,
+    co2RangeByYear: () => ({ low: 0, mid: 0, high: 0 }),
+    listPriceRangeByYear: (_y, _isCab, text) => {
+      const mid = /taycan|e-?tron\s+gt|eqs|i7|model\s+[sx]/i.test(text) ? 88000 : /i4|ix3|eqe|i5|q8\s+e-?tron/i.test(text) ? 56000 : 39500;
+      return { low: Math.round(mid * 0.92), mid, high: Math.round(mid * 1.08) };
+    },
+    body: (_isCab, text) => (/suv|ix|q4|q8|eqa|eqb|eqc|model\s+[yx]|id\.[45]|ioniq\s*5|ev[69]/i.test(text || '') ? 'suv' : 'sedan'),
+    confidence: 'high',
+    label: 'Pure Electric BEV (0 g/km CO₂ — 100% Exempt from Greek Registration Tax & Road Tax)',
+  },
+  {
     matchRe: /\bbmw\b.*\b(r\s*1250\s*gs|r1250gs|r\s*1300\s*gs|s\s*1000\s*rr)\b/i,
     category: 'motorcycle',
     fuel: 'petrol',
@@ -662,16 +749,21 @@ function rho(months, vatRate = 0.19) {
 }
 
 export function normalizeFuelType(rawText = '') {
-  const s = String(rawText).toLowerCase();
+  const s = String(rawText).toLowerCase().trim();
+  if (!s) return 'petrol';
   if (/wasserstoff|hydrogen|fuel.?cell/.test(s)) return 'hydrogen';
-  if (/plug.?in|steckdose|\bphev\b|enchufable|\btfsi\s*e\b|\bgte\b|e-?hybrid|\bedrive\b|\bi8\b|296\s*gtb|sf90/.test(s)) {
+  // Explicit pure-electric check FIRST when no petrol/diesel/hybrid co-occurs
+  if (
+    /(?:\b(?:elektro|elektrisch|electric|elettrica|elettrico|eléctrico|elektryczny|électrique|electrique|elektromotor|elektrické|strom|bev)\b|ηλεκτρικ|full\s*electric|100%\s*electric|\b(?:taycan|tesla|ioniq\s*[56]|kia\s*ev[369]|polestar\s*[234]|bmw\s*(?:i3|i4|ix|ix1|ix2|ix3|i5|i7))\b)/i.test(s) &&
+    !/benzin|petrol|essence|gasolina|diesel|hybrid|hybryd|ibrid|híbrid|plug.?in|\bphev\b|\bi8\b|\btfsi\s*e\b/i.test(s)
+  ) {
+    return 'electric';
+  }
+  if (/plug.?in|\bphev\b|enchufable|\btfsi\s*e\b|\bgte\b|e-?hybrid|\bi8\b|296\s*gtb|sf90|(?:bmw\s*(?:330e|530e|545e|745e|x3\s*xdrive30e|x5\s*xdrive45e|x5\s*xdrive50e))/.test(s)) {
     return 'plugin_hybrid';
   }
   if (/mild.?hybrid|\bmhev\b|48\s?v|\betsi\b|eq\s?boost/.test(s)) return 'mild_hybrid';
-  if (/hybrid|hybryda|ibrida|híbrido|elektr.*\/.*benz|benz.*\/.*elektr/.test(s)) return 'hybrid';
-  if (/\b(elektro|electric|elettrica|eléctrico|elektryczny|strom|bev)\b/.test(s) && !/benzin|diesel|hybrid|ibrid/.test(s)) {
-    return 'electric';
-  }
+  if (/hybrid|hybryda|ibrida|híbrido|υβριδικ|elektr.*\/.*benz|benz.*\/.*elektr|elektr.*\/.*dies|dies.*\/.*elektr/.test(s)) return 'hybrid';
   if (/diesel|πετρέλαιο|\bon\b|\btdi\b|\bcdi\b|\bdci\b|\bbluehdi\b/.test(s)) return 'diesel';
   return 'petrol';
 }
@@ -1130,10 +1222,21 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
   const clearanceIso = now.toISOString().slice(0, 10);
   const midAgeMonths = Math.max(1, (clearanceYear - reg.year) * 12 + (clearanceMonth - reg.month));
 
-  const profile = MODEL_PROFILES.find((p) => p.matchRe.test(combinedText));
-  const isRoadster = profile?.roadsterRe
-    ? profile.roadsterRe.test(combinedText)
-    : /roadster|cabrio|spyder|convertible/i.test(combinedText);
+  const rawProfile = MODEL_PROFILES.find((p) => p.matchRe.test(combinedText));
+  const isRoadster = rawProfile?.roadsterRe
+    ? rawProfile.roadsterRe.test(combinedText)
+    : /roadster|cabrio|spyder|spider|convertible|targa|aperta/i.test(combinedText);
+
+  const explicitItemFuel = item.fuelType ? normalizeFuelType(item.fuelType) : null;
+  const fuel =
+    overrides.fuel ||
+    (rawProfile ? rawProfile.fuel : explicitItemFuel || normalizeFuelType(combinedText));
+
+  // Only apply a model profile's specs/label if the user didn't explicitly override fuel to an incompatible drivetrain (e.g. switching BMW i8 to Electric BEV)
+  const profile =
+    rawProfile && (!overrides.fuel || overrides.fuel === rawProfile.fuel || (overrides.fuel === 'hybrid' && rawProfile.fuel === 'plugin_hybrid'))
+      ? rawProfile
+      : null;
 
   const category =
     overrides.category ||
@@ -1141,13 +1244,15 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
     (profile?.category ? profile.category : inferVehicleCategory(combinedText, reg.year));
   const catMeta = VEHICLE_CATEGORIES.find((c) => c.id === category) || VEHICLE_CATEGORIES[0];
 
-  const fuel = overrides.fuel || (profile ? profile.fuel : normalizeFuelType(combinedText));
-  const body = overrides.body || (profile ? profile.body(isRoadster) : inferBodyClass(combinedText));
-  const cc = Number(
-    overrides.cc ||
-      item.cc ||
-      (profile ? profile.cc : category === 'motorcycle' ? 1000 : category === 'bus' ? 7700 : 1998)
-  );
+  const body = overrides.body || (profile ? profile.body(isRoadster, combinedText) : inferBodyClass(combinedText));
+  const isPureEvOrH2 = fuel === 'electric' || fuel === 'hydrogen';
+  const cc = isPureEvOrH2
+    ? 0
+    : Number(
+        overrides.cc ||
+          item.cc ||
+          (profile ? profile.cc : category === 'motorcycle' ? 1000 : category === 'bus' ? 7700 : 1998)
+      );
   const gvwKg = Number(overrides.gvwKg || item.gvwKg || (category === 'truck_heavy' ? 18000 : 3000));
   const seats = Number(overrides.seats || item.seats || (category === 'bus' ? 50 : 5));
   const vatRegime =
@@ -1199,7 +1304,11 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
     confidence = 'high';
   } else {
     const kmFactor = Math.min(1.25, Math.max(0.80, 1 + (0.0025 * (effectiveKm - allowanceKm)) / 1000));
-    const midLp = Math.round((item.priceEur * kmFactor) / rho(midAgeMonths, geo.vat));
+    const rawRho = rho(midAgeMonths, geo.vat);
+    // Supercars & exotics (>€85k asking price or ≥3,800 cc) retain 60%–85% of MSRP rather than depreciating like mass-market sedans
+    const isExoticRetention = item.priceEur >= 85000 || cc >= 3800;
+    const effectiveRho = isExoticRetention ? Math.max(rawRho, 0.78 * (1 + geo.vat)) : rawRho;
+    const midLp = Math.round((item.priceEur * kmFactor) / effectiveRho);
     listPriceRange = hasVerifiedIdentity
       ? { low: midLp, mid: midLp, high: midLp }
       : {
@@ -1207,10 +1316,12 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
           mid: midLp,
           high: Math.round(midLp * 1.12),
         };
-    listPriceSource = hasVerifiedIdentity
-      ? `VIN-Locked Pre-Tax ΛΤΠΦ (€${midLp.toLocaleString()})`
-      : `Residual-value back-solved ΛΤΠΦ (${midAgeMonths}m curve ±11%)`;
-    confidence = hasVerifiedIdentity ? 'high' : 'medium';
+    listPriceSource = isPureEvOrH2
+      ? `Pure Electric BEV Pre-Tax ΛΤΠΦ (€${midLp.toLocaleString()} · 100% Registration Tax Exempt)`
+      : hasVerifiedIdentity
+        ? `VIN-Locked Pre-Tax ΛΤΠΦ (€${midLp.toLocaleString()})`
+        : `Residual-value back-solved ΛΤΠΦ (${midAgeMonths}m curve ±11%)`;
+    confidence = hasVerifiedIdentity || isPureEvOrH2 ? 'high' : 'medium';
   }
 
   // 2. Factory Optional Equipment (Πρόσθετος Εξοπλισμός Extras — ΑΑΔΕ Α.1043/2025)
@@ -1258,10 +1369,11 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
           ? Number(item.decodedVin.co2)
           : null;
   let co2Range;
-  if (exactCo2Val != null && !Number.isNaN(exactCo2Val)) {
-    co2Range = { low: exactCo2Val, mid: exactCo2Val, high: exactCo2Val };
-  } else if (fuel === 'electric' || fuel === 'hydrogen') {
+  if (isPureEvOrH2) {
+    // Pure Electric BEV & Hydrogen Fuel Cell vehicles ALWAYS have 0 g/km tailpipe CO2
     co2Range = { low: 0, mid: 0, high: 0 };
+  } else if (exactCo2Val != null && !Number.isNaN(exactCo2Val)) {
+    co2Range = { low: exactCo2Val, mid: exactCo2Val, high: exactCo2Val };
   } else if (profile) {
     const rawCo2 = profile.co2RangeByYear(reg.year, isRoadster, combinedText);
     co2Range = hasVerifiedIdentity ? { low: rawCo2.mid, mid: rawCo2.mid, high: rawCo2.mid } : rawCo2;

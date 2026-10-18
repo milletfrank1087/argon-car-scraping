@@ -1622,9 +1622,11 @@ export async function searchAutoUncleDe(
         co2: co2Match ? Number(co2Match[1]) : null,
         fuelType: /elektrisch\/benzin|plug-in|hybrid/i.test(t)
           ? 'Hybrid (Benzin/Elektro)'
-          : /diesel/i.test(t)
-            ? 'Diesel'
-            : 'Benzin',
+          : /\b(elektro|elektrisch|electric|strom|bev)\b/i.test(t)
+            ? 'Elektro'
+            : /diesel/i.test(t)
+              ? 'Diesel'
+              : 'Benzin',
         gearbox: /automatik/i.test(t) ? 'Automatik' : null,
         sellerType: 'Dealer',
         sellerName: 'AutoUncle Verified Listing',

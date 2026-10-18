@@ -2786,9 +2786,9 @@
           </div>
           <div class="chip-grid">
             <button type="button" class="preset-btn" data-q="bmw i8" data-y="" data-p="">BMW i8</button>
+            <button type="button" class="preset-btn" data-q="lamborghini huracan" data-y="" data-p="">Huracán V10</button>
             <button type="button" class="preset-btn" data-q="porsche 911" data-y="2018" data-p="">Porsche 911</button>
             <button type="button" class="preset-btn" data-q="audi a3 40 tfsi e" data-y="2021" data-p="">Audi A3 PHEV</button>
-            <button type="button" class="preset-btn" data-q="ford mustang" data-y="2017" data-p="45000">Ford Mustang</button>
             <button type="button" class="preset-btn" data-q="audi r8" data-y="" data-p="">Audi R8 V10</button>
             <button type="button" class="preset-btn" data-q="mercedes amg gt" data-y="" data-p="">AMG GT</button>
           </div>
@@ -2983,10 +2983,10 @@
         </section>
 
         <!-- SECTION 3: COLLAPSIBLE ACCORDION FOR CUSTOM VIN / SPEC OVERRIDES -->
-        <details class="extras-panel" id="customSpecsAccordion">
+        <details class="extras-panel" id="customSpecsAccordion" open>
           <summary style="cursor:pointer;font-family:var(--font-mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--fg);display:flex;justify-content:space-between;align-items:center;">
             <span>03 / CUSTOM VIN, NATIONAL PLATE &amp; FACTORY EQUIPMENT OVERRIDES</span>
-            <span style="color:var(--fg-muted);font-weight:500;">EXPAND ▾</span>
+            <span style="color:var(--fg-muted);font-weight:500;">EXPAND / COLLAPSE ▾</span>
           </summary>
           <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">
             <div class="dossier-vin-bar-grid">
@@ -2995,6 +2995,9 @@
               <input type="text" id="calcListingUrl" placeholder="Listing URL (Otomoto, Mobile.de, AutoScout24, Sauto...)" style="font-family:var(--font-mono);font-size:11.5px;" />
               <select id="dossierPresetSelect" style="font-family:var(--font-mono);font-size:11px;" onchange="if(this.value){loadDossierPreset(this.value);}">
                 <option value="">Load Preset…</option>
+                <option value="huracan_v10">Lamborghini Huracán LP 610-4 V10 (5,204 cc)</option>
+                <option value="huracan_evo">Lamborghini Huracán EVO V10 (Post-09/2018)</option>
+                <option value="electric_taycan">Porsche Taycan 4S Electric BEV (0% Tax)</option>
                 <option value="i8_vin">BMW i8 PHEV (VIN)</option>
                 <option value="supercar_ferrari">Ferrari 488 (&lt;6k km VAT)</option>
                 <option value="motorcycle_gs">BMW R1250GS Moto (87.11)</option>
@@ -3763,8 +3766,17 @@
 
       const elVeh = document.getElementById('dkpiVehicle');
       if (elVeh) elVeh.textContent = titleVal;
+      const fuelDisplayMap = {
+        electric: 'Electric BEV (100% Exempt)',
+        plugin_hybrid: 'Plug-In Hybrid (PHEV)',
+        hybrid: 'Full Hybrid (HEV)',
+        petrol: 'Petrol',
+        diesel: 'Diesel',
+        hydrogen: 'Hydrogen Fuel Cell',
+      };
+      const fuelDisplay = fuelDisplayMap[gi.fuel] || gi.fuel || 'Petrol';
       const elOrig = document.getElementById('dkpiOrigin');
-      if (elOrig) elOrig.textContent = `${gi.originCountryName || countryVal} (${countryVal}) · Reg ${regVal} · ${kmVal ? kmVal.toLocaleString() + ' km' : '—'} · ${sMid.co2 ?? 0}g CO₂`;
+      if (elOrig) elOrig.textContent = `${gi.originCountryName || countryVal} (${countryVal}) · Reg ${regVal} · ${kmVal ? kmVal.toLocaleString() + ' km' : '—'} · ${fuelDisplay} · ${gi.cc ? gi.cc + ' cc · ' : ''}${sMid.co2 ?? 0}g CO₂`;
       const elIdent = document.getElementById('dkpiIdentity');
       if (elIdent) {
         elIdent.innerHTML = (vinVal || plateVal)
@@ -3851,7 +3863,7 @@
             <tr>
               <td>
                 <strong>3. Pre-Depreciation Base &amp; Bracket Rate</strong><br/>
-                <span style="font-size:11px;color:var(--ink-500);">Displacement: ${gi.cc || 1998} cc ${gi.category === 'bus' ? `• Seats: ${gi.seats}` : gi.category?.startsWith('truck_') ? `• GVW: ${gi.gvwKg} kg` : ''} (${sMid.priceBandRatePct}% base scale)</span>
+                <span style="font-size:11px;color:var(--ink-500);">${gi.fuel === 'electric' || gi.fuel === 'hydrogen' ? 'Drivetrain: Pure Electric BEV (0 cc — Zero Combustion Displacement)' : `Displacement: ${gi.cc || 1998} cc`}${gi.category === 'bus' ? ` • Seats: ${gi.seats}` : gi.category?.startsWith('truck_') ? ` • GVW: ${gi.gvwKg} kg` : ''} (${sMid.priceBandRatePct}% base scale)</span>
               </td>
               ${isExact ? `
                 <td class="num">${fmtEur(sMid.baseValueEur)}</td>
@@ -4233,6 +4245,57 @@
 
     window.loadDossierPreset = function(presetKey) {
       const presets = {
+        huracan_v10: {
+          vin: 'ZHWEC1ZF6HVA06842',
+          category: 'passenger',
+          title: 'Lamborghini Huracán LP 610-4 Coupé 5.2 V10',
+          price: 165000,
+          country: 'DE',
+          reg: '06/2017',
+          km: 32000,
+          cc: 5204,
+          co2: 280,
+          fuel: 'petrol',
+          body: 'coupe',
+          seats: 2,
+          gvw: 1750,
+          vatRegime: 'margin_scheme',
+          listPrice: 172000,
+        },
+        huracan_evo: {
+          vin: 'ZHWEC4ZF8KLA12480',
+          category: 'passenger',
+          title: 'Lamborghini Huracán EVO AWD Coupé 5.2 V10',
+          price: 219000,
+          country: 'DE',
+          reg: '10/2020',
+          km: 19500,
+          cc: 5204,
+          co2: 332,
+          fuel: 'petrol',
+          body: 'coupe',
+          seats: 2,
+          gvw: 1770,
+          vatRegime: 'margin_scheme',
+          listPrice: 188000,
+        },
+        electric_taycan: {
+          vin: 'WP0ZZZY1ZMSA41234',
+          category: 'passenger',
+          title: 'Porsche Taycan 4S Performance Battery Plus (Electric BEV)',
+          price: 64900,
+          country: 'DE',
+          reg: '05/2022',
+          km: 34000,
+          cc: 0,
+          co2: 0,
+          fuel: 'electric',
+          body: 'sedan',
+          seats: 4,
+          gvw: 2880,
+          vatRegime: 'margin_scheme',
+          listPrice: 88000,
+        },
         i8_vin: {
           vin: 'WBY2Z2C50GV676109',
           category: 'passenger',
@@ -5047,8 +5110,175 @@
         runDeepResearchModal(null, true);
       }
     });
+    // --- Real-Time Calculator Spec Auto-Sync (Drivetrain & Vehicle Model Profiles) ---
+    function syncCalculatorDrivetrainChange() {
+      const fuelEl = document.getElementById('calcFuel');
+      const ccEl = document.getElementById('calcCc');
+      const co2El = document.getElementById('calcCo2');
+      const titleEl = document.getElementById('calcTitle');
+      if (!fuelEl || !ccEl || !co2El) return;
+
+      const fuel = fuelEl.value;
+      if (fuel === 'electric') {
+        ccEl.value = 0;
+        co2El.value = 0;
+        if (titleEl && /\b(phev|plug-?in|hybrid|edrive|tfsi\s*e)\b/i.test(titleEl.value)) {
+          titleEl.value = titleEl.value
+            .replace(/\b(1\.5\s*edrive\s*phev|edrive\s*phev|plug-?in\s*hybrid|phev|hybrid)\b/gi, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim() + ' (Electric BEV)';
+        } else if (titleEl && /^bmw\s+i8/i.test(titleEl.value.trim())) {
+          titleEl.value = 'Electric BEV (Zero-Emission)';
+        }
+      } else {
+        if (titleEl && /\(Electric BEV\)$/i.test(titleEl.value)) {
+          titleEl.value = titleEl.value.replace(/\s*\(Electric BEV\)$/i, '').trim();
+        }
+        const curCc = Number(ccEl.value || 0);
+        const curCo2 = Number(co2El.value || 0);
+        if (fuel === 'plugin_hybrid') {
+          if (curCc === 0 || curCc > 4000) ccEl.value = 1499;
+          if (curCo2 === 0 || curCo2 > 80) co2El.value = 42;
+        } else if (fuel === 'hybrid') {
+          if (curCc === 0) ccEl.value = 1998;
+          if (curCo2 === 0 || curCo2 <= 50 || curCo2 > 180) co2El.value = 110;
+        } else if (fuel === 'petrol') {
+          if (curCc === 0 || curCc === 1499) ccEl.value = 1998;
+          if (curCo2 <= 60) co2El.value = 165;
+        } else if (fuel === 'diesel') {
+          if (curCc === 0 || curCc === 1499) ccEl.value = 1995;
+          if (curCo2 <= 60) co2El.value = 135;
+        }
+      }
+      fetchCustomCalc();
+    }
+
+    function syncCalculatorTitleSpecs() {
+      const titleEl = document.getElementById('calcTitle');
+      if (!titleEl) return;
+      const t = titleEl.value.trim().toLowerCase();
+      if (!t) return;
+
+      const ccEl = document.getElementById('calcCc');
+      const co2El = document.getElementById('calcCo2');
+      const fuelEl = document.getElementById('calcFuel');
+      const bodyEl = document.getElementById('calcBody');
+      const lpEl = document.getElementById('calcListPrice');
+      const vinEl = document.getElementById('calcVinInput');
+      const regStr = document.getElementById('calcReg')?.value || '2018';
+      const regYear = Number((regStr.match(/\b(19\d\d|20\d\d)\b/) || [2018])[0]);
+      const isRoadster = /spyder|spider|cabrio|roadster|convertible|targa|aperta/i.test(t);
+
+      // Clear stale VIN if it belonged to a different manufacturer
+      if (vinEl && vinEl.value) {
+        const v = vinEl.value.toUpperCase();
+        if ((/hurac[aá]n|lamborghini|urus|aventador/.test(t) && !v.startsWith('ZHW')) ||
+            (/ferrari/.test(t) && !v.startsWith('ZFF')) ||
+            (/porsche|911|taycan/.test(t) && !v.startsWith('WP0') && !v.startsWith('WP1')) ||
+            (/bmw\s+i8/.test(t) && !v.startsWith('WBY'))) {
+          vinEl.value = '';
+          const counterEl = document.getElementById('vinCharCounter');
+          if (counterEl) counterEl.textContent = '0/17 chars (auto-decodes at 17)';
+        }
+      }
+
+      if (/hurac[aá]n|\blp\s*610\b|\blp\s*580\b|\blp\s*640\b/.test(t)) {
+        ccEl.value = 5204;
+        co2El.value = /\bsto\b|\bsterrato\b|\btecnica\b/.test(t) ? 331 : (regYear >= 2019 || /\bevo\b/.test(t)) ? 332 : /\bperformante\b/.test(t) ? 314 : 280;
+        fuelEl.value = 'petrol';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\burus\b/.test(t)) {
+        ccEl.value = 3996;
+        const isSe = /\bse\b|\bphev\b/.test(t);
+        co2El.value = isSe ? 51 : 320;
+        fuelEl.value = isSe ? 'plugin_hybrid' : 'petrol';
+        bodyEl.value = 'suv';
+        if (lpEl) lpEl.value = '';
+      } else if (/\baventador\b/.test(t)) {
+        ccEl.value = 6498;
+        co2El.value = 398;
+        fuelEl.value = 'petrol';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\br8\b/.test(t)) {
+        ccEl.value = 5204;
+        co2El.value = regYear >= 2021 ? 297 : 287;
+        fuelEl.value = 'petrol';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\bferrari\b|\b488\b|\bf8\b|\b296\b|\bsf90\b|\b812\b/.test(t)) {
+        const isPhev = /296|sf90/.test(t);
+        ccEl.value = /296/.test(t) ? 2992 : /812/.test(t) ? 6496 : 3902;
+        co2El.value = isPhev ? 154 : 275;
+        fuelEl.value = isPhev ? 'plugin_hybrid' : 'petrol';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b911\b|\bcarrera\b|\bgt3\b/.test(t)) {
+        ccEl.value = /gt3/.test(t) ? 3996 : 2981;
+        co2El.value = /gt3|turbo/.test(t) ? 295 : regYear >= 2021 ? 241 : 206;
+        fuelEl.value = 'petrol';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\bamg\s*gt\b/.test(t)) {
+        ccEl.value = 3982;
+        co2El.value = regYear >= 2021 ? 284 : 224;
+        fuelEl.value = 'petrol';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\bmustang\b/.test(t)) {
+        const isEco = /2\.3|ecoboost/.test(t);
+        ccEl.value = isEco ? 2261 : 4951;
+        co2El.value = isEco ? 184 : 260;
+        fuelEl.value = 'petrol';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b(taycan|tesla|model\s*[3ysx]|e-?tron\s*gt|q4\s*e-?tron|q8\s*e-?tron|bmw\s*(?:i3|i4|ix|ix1|ix3|i5|i7)|eqa|eqb|eqc|eqe|eqs|id\.[3457]|ioniq\s*[56]|ev[369]|polestar)\b/.test(t)) {
+        ccEl.value = 0;
+        co2El.value = 0;
+        fuelEl.value = 'electric';
+        bodyEl.value = /suv|ix|q4|q8|eqa|eqb|eqc|model\s*[yx]|id\.[45]|ioniq\s*5|ev[69]/.test(t) ? 'suv' : 'sedan';
+        if (lpEl) lpEl.value = '';
+      } else if (/\bbmw\b.*\bi8\b|\bi8\b/.test(t)) {
+        ccEl.value = 1499;
+        co2El.value = regYear >= 2018 ? (isRoadster ? 46 : 42) : 49;
+        fuelEl.value = 'plugin_hybrid';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\ba3\b.*\b(40\s*tfsi\s*e|phev|e-?tron)\b/.test(t)) {
+        ccEl.value = 1395;
+        co2El.value = 26;
+        fuelEl.value = 'plugin_hybrid';
+        bodyEl.value = 'hatchback';
+        if (lpEl) lpEl.value = '';
+      }
+      fetchCustomCalc();
+    }
+
+    let calcInputDebounceTimer = null;
+    function scheduleCustomCalc() {
+      clearTimeout(calcInputDebounceTimer);
+      calcInputDebounceTimer = setTimeout(fetchCustomCalc, 180);
+    }
+
     document.getElementById('calcCategory').addEventListener('change', fetchCustomCalc);
     document.getElementById('calcVatRegime').addEventListener('change', fetchCustomCalc);
+    document.getElementById('calcFuel').addEventListener('change', syncCalculatorDrivetrainChange);
+    document.getElementById('calcBody').addEventListener('change', fetchCustomCalc);
+    document.getElementById('calcCountry').addEventListener('change', fetchCustomCalc);
+    document.getElementById('calcTitle').addEventListener('change', syncCalculatorTitleSpecs);
+    document.getElementById('calcTitle').addEventListener('input', () => {
+      clearTimeout(calcInputDebounceTimer);
+      calcInputDebounceTimer = setTimeout(syncCalculatorTitleSpecs, 260);
+    });
+    for (const calcFieldId of ['calcPrice', 'calcReg', 'calcKm', 'calcCc', 'calcCo2', 'calcListPrice', 'calcExtrasManual']) {
+      const el = document.getElementById(calcFieldId);
+      if (el) {
+        el.addEventListener('change', fetchCustomCalc);
+        el.addEventListener('input', scheduleCustomCalc);
+      }
+    }
+    optionsGrid.addEventListener('change', fetchCustomCalc);
 
     document.getElementById('printDossierBtn').addEventListener('click', () => {
       window.print();
@@ -5314,7 +5544,17 @@
     document.getElementById('closeCompareModalBtn').addEventListener('click', () => compareModal.classList.remove('open'));
 
     document.getElementById('openCustomCalcBtn').addEventListener('click', () => {
-      fetchCustomCalc();
+      const acc = document.getElementById('customSpecsAccordion');
+      if (acc) acc.open = true;
+      // If user has searched a different model in the sidebar, sync the calculator title & specs to match
+      const activeSearchQuery = (document.getElementById('qInput')?.value || '').trim();
+      const currentCalcTitle = (document.getElementById('calcTitle')?.value || '').trim();
+      if (activeSearchQuery && currentCalcTitle === 'BMW i8 Coupe' && !/bmw\s*i8/i.test(activeSearchQuery)) {
+        document.getElementById('calcTitle').value = activeSearchQuery;
+        syncCalculatorTitleSpecs();
+      } else {
+        fetchCustomCalc();
+      }
       calcModal.classList.add('open');
     });
     document.getElementById('closeModalBtn').addEventListener('click', () => {

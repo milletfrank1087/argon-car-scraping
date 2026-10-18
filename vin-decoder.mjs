@@ -642,15 +642,39 @@ const VDS_PATTERNS = [
     body: 'coupe',
   },
   {
+    re: /^ZHWU/i,
+    make: 'Lamborghini',
+    model: 'Urus 4.0 V8 BiTurbo',
+    variant: 'Automobili Lamborghini Urus SUV (Δ.Κ. 87.03)',
+    category: 'passenger',
+    fuel: 'petrol',
+    cc: 3996,
+    co2: 320,
+    listPriceEur: 185000,
+    body: 'suv',
+  },
+  {
+    re: /^ZHWA/i,
+    make: 'Lamborghini',
+    model: 'Aventador 6.5 V12',
+    variant: 'Automobili Lamborghini Aventador V12 (Δ.Κ. 87.03)',
+    category: 'passenger',
+    fuel: 'petrol',
+    cc: 6498,
+    co2: 398,
+    listPriceEur: 285000,
+    body: 'coupe',
+  },
+  {
     re: /^ZHW/i,
     make: 'Lamborghini',
-    model: 'Huracán / Urus',
-    variant: 'Automobili Lamborghini Sant’Agata (Δ.Κ. 87.03)',
+    model: 'Huracán 5.2 V10',
+    variant: 'Automobili Lamborghini Huracán 5.2 V10 (Δ.Κ. 87.03)',
     category: 'passenger',
     fuel: 'petrol',
     cc: 5204,
-    co2: 290,
-    listPriceEur: 198000,
+    co2: 285,
+    listPriceEur: 182000,
     body: 'coupe',
   },
   {
@@ -1311,11 +1335,20 @@ export async function inspectListingPage(targetUrl, browserContext = null) {
     pdCc ||
     (ccMatch ? Number(String(ccMatch[1]).replace(/[\s.,]/g, '')) : decodedVin?.cc || null);
 
-  // Fuel / Drivetrain
-  const pdFuelRaw = pd.fuel_type?.values?.[0]?.value || pd.fuel_type?.values?.[0]?.label || '';
+  // Fuel / Drivetrain — avoid running normalizeFuelType on full visibleText (which contains portal filter menus with "Hybrid/Plug-in")
+  const pdFuelRaw =
+    pd.fuel_type?.values?.[0]?.value ||
+    pd.fuel_type?.values?.[0]?.label ||
+    sautoDetail?.fuelType ||
+    rdwDetail?.fuel ||
+    '';
+  const structuredFuelMatch =
+    html.match(/"(?:fuelType|fuel|kraftstoff|carburant|carburante|combustible)"\s*:\s*"([^"]{2,40})"/i) ||
+    visibleText.match(/(?:Kraftstoffart|Fuel\s*type|Palivo|Paliwo|Carburante|Combustibil|Καύσιμο|Brandstof)\s*[:\s]+([^\n\r|•]{3,35})/i);
   const fuel = pdFuelRaw
     ? normalizeFuelType(pdFuelRaw)
-    : decodedVin?.fuel || normalizeFuelType(combinedSource);
+    : decodedVin?.fuel ||
+      (structuredFuelMatch ? normalizeFuelType(structuredFuelMatch[1]) : normalizeFuelType(`${pageTitle} ${sautoDetail?.title || ''}`));
 
   // Body Class
   const pdBodyRaw = pd.body_type?.values?.[0]?.value || '';
