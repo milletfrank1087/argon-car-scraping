@@ -3120,8 +3120,22 @@
                 </select>
               </div>
               <div class="control-group">
-                <label class="control-label">Base ΛΤΠΦ (€)</label>
-                <input type="number" id="calcListPrice" placeholder="Auto / VIN" step="500" />
+                <label class="control-label">Base ΛΤΠΦ (€) <a href="https://www.aade.gr/timokatalogoi" target="_blank" rel="noopener" style="font-size:9.5px;color:var(--accent-navy);text-decoration:underline;margin-left:4px;" title="Open Official AADE Greek Importer ΛΤΠΦ Pricelists">ΑΑΔΕ ↗</a></label>
+                <input type="number" id="calcListPrice" placeholder="Auto / Greek ΛΤΠΦ" step="500" />
+              </div>
+              <div class="control-group">
+                <label class="control-label" title="Enter any Greek New Retail Price (ΑΠΛΤ with 24% VAT & Registration Tax from gocar.gr / autotriti.gr / official .gr pricelist) to mathematically invert to exact ΛΤΠΦ">Greek ΑΠΛΤ → ΛΤΠΦ (€)</label>
+                <input type="number" id="calcGreekRetail" placeholder="e.g. 27480 (Inverts)" step="500" />
+              </div>
+              <div class="control-group">
+                <label class="control-label">Greek Trim Tier</label>
+                <select id="calcGreekTrimKey">
+                  <option value="">Auto-Detect Trim</option>
+                  <option value="base">Base (Active / Life / Core)</option>
+                  <option value="mid">Mid (Style / Business / Techno)</option>
+                  <option value="sport">Sport (R-Line / M-Sport / AMG / GR)</option>
+                  <option value="flagship">Flagship (Premiere / Exclusive / L&amp;K)</option>
+                </select>
               </div>
               <div class="control-group">
                 <label class="control-label">Extras Override (€)</label>
@@ -3132,6 +3146,11 @@
                 <input type="number" id="calcGvw" value="3000" />
                 <input type="hidden" id="calcShipping" value="" />
               </div>
+            </div>
+
+            <div style="margin-top:8px;">
+              <label class="control-label" style="display:block;margin-bottom:4px;">📋 Paste OEM Build-Sheet / S-Codes / PR-Codes / SA-Codes / carVertical Equipment (ΑΑΔΕ Α.1043/2025 Annex I Auto-Valuator)</label>
+              <input type="text" id="calcBuildSheetText" placeholder="e.g. S337A M Sport Package, S402A Panorama glass roof, S5AZA Laserlight, S688A Harman/Kardon, S610A HUD..." style="width:100%;font-family:var(--font-mono);font-size:11.5px;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-surface);" />
             </div>
 
             <div class="options-checkbox-grid" id="optionsCheckboxGrid" style="margin-top:4px;"></div>
@@ -3467,6 +3486,18 @@
         }
         if (!isGr && gi.exemptionShare >= 0.75) {
           cardTags.push(`<span class="inst-tag ok">PHEV -75% TAX</span>`);
+        }
+        if (!isGr && gi.hasVerifiedLtpf && gi.baseListPriceEur > 0) {
+          cardTags.push(`<span class="inst-tag ok" title="Verified Greek Importer / OEM ΛΤΠΦ: €${gi.baseListPriceEur.toLocaleString()}">ΛΤΠΦ €${(gi.baseListPriceEur / 1000).toFixed(1)}k GR</span>`);
+        }
+        if (!isGr && gi.isSalvageOrDamaged) {
+          cardTags.push(`<span class="inst-tag" style="background:rgba(185,28,28,0.12);color:#991b1b;border-color:rgba(185,28,28,0.35);" title="Α.1203/2019 Art. 4: 0% customs discount for crash/engine damage — taxed on 100% undamaged ΛΤΠΦ">⚠️ SALVAGE / 0% TAX DISC</span>`);
+        }
+        if (!isGr && Array.isArray(gi.statutoryCliffs?.alerts) && gi.statutoryCliffs.alerts.length > 0) {
+          cardTags.push(`<span class="inst-tag" style="background:rgba(180,83,9,0.12);color:#92400e;border-color:rgba(180,83,9,0.35);" title="${(gi.statutoryCliffs.alerts[0]?.title || '').replace(/"/g, '&quot;')}">🛡️ CLIFF ALERT</span>`);
+        }
+        if (!isGr && gi.registrationBanned) {
+          cardTags.push(`<span class="inst-tag" style="background:#FEE2E2;color:#991B1B;border-color:#991B1B;" title="ν. 4710/2020 Art. 5: Euro 1–3 (<2005) registration prohibited in Greece">⛔ EURO 1-3 BAN</span>`);
         }
         if (isGr) {
           cardTags.push(`<span class="inst-tag">GR DOMESTIC</span>`);
@@ -3813,13 +3844,63 @@
         </div>
       ` : '';
 
+      const salvageBannerHtml = gi.isSalvageOrDamaged ? `
+        <div class="alert-note" style="background:rgba(185,28,28,0.09);border:1px solid rgba(185,28,28,0.45);border-left:4px solid #b91c1c;color:#7f1d1d;font-size:11.5px;margin-bottom:8px;padding:9px 12px;border-radius:var(--radius-sm);">
+          <div style="font-family:var(--font-mono);font-weight:700;color:#991b1b;margin-bottom:3px;text-transform:uppercase;">
+            ⚠️ SALVAGE / ACCIDENT-DAMAGED CUSTOMS TRAP (ν. 5222/2025 Άρθρο 142 &amp; Α.1203/2019 Άρθρο 4)
+          </div>
+          <div>${gi.salvageCustomsWarning || 'Greek Customs grants 0% extra depreciation for accident, flood, fire, or engine/gearbox damage. Registration tax is calculated on 100% of the undamaged factory ΛΤΠΦ.'}</div>
+        </div>
+      ` : '';
+
+      const cliffAlerts = gi.statutoryCliffs?.alerts || [];
+      const cliffBannerHtml = cliffAlerts.length > 0 ? `
+        <div style="background:rgba(180,83,9,0.08);border:1px solid rgba(180,83,9,0.4);border-left:4px solid #b45309;padding:8px 12px;margin-bottom:8px;border-radius:var(--radius-sm);font-size:11.5px;">
+          <div style="font-family:var(--font-mono);font-weight:700;color:#92400e;margin-bottom:4px;text-transform:uppercase;">
+            🛡️ Statutory Boundary-Cliff &amp; VIN Model-Year Forensic Audit (${cliffAlerts.length} Active Alert${cliffAlerts.length > 1 ? 's' : ''})
+          </div>
+          ${cliffAlerts.map(a => `
+            <div style="margin-top:3px;color:var(--ink-900);">
+              <strong style="color:${a.severity === 'critical' ? '#b91c1c' : '#92400e'};">[${a.code}] ${a.title}:</strong> ${a.detail}
+            </div>
+          `).join('')}
+        </div>
+      ` : '';
+
+      const trimPillsHtml = Array.isArray(gi.availableGreekTrims) && gi.availableGreekTrims.length > 0 ? `
+        <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500);font-weight:700;">MY${gi.effectivePricelistYear || ''} GREEK IMPORTER TRIMS:</span>
+          ${gi.availableGreekTrims.map(t => {
+            const isSel = gi.activeGreekTrimKey === t.key;
+            return `<button type="button" onclick="window.selectGreekTrimTier('${t.key}')" style="cursor:pointer;padding:2px 7px;border-radius:3px;font-family:var(--font-mono);font-size:10px;font-weight:${isSel ? '700' : '500'};background:${isSel ? 'var(--ink-900)' : 'var(--bg-subtle)'};color:${isSel ? '#fff' : 'var(--ink-900)'};border:1px solid var(--border-strong);" title="${t.name} • Greek Retail ΑΠΛΤ €${t.apltEur.toLocaleString()} • ${t.co2}g CO₂">
+              ${t.key.toUpperCase()}: €${t.ltpfEur.toLocaleString()} ΛΤΠΦ
+            </button>`;
+          }).join('')}
+        </div>
+      ` : '';
+
+      const buildSheetItems = gi.parsedBuildSheet?.detectedItems || [];
+      const buildSheetHtml = buildSheetItems.length > 0 ? `
+        <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">
+          ${buildSheetItems.map(it => `<span style="padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-size:9.5px;background:rgba(4,120,87,0.1);color:#047857;border:1px solid rgba(4,120,87,0.25);">✓ ${it.matchedToken}: ${it.label.split('(')[0].trim()} (+€${it.greekPreTaxEur.toLocaleString()})</span>`).join('')}
+        </div>
+      ` : '';
+
+      const isEuro4Or5 = gi.euroBand === 'euro5a' || gi.euroBand === 'euro5b' || gi.euroBand === 'euro4';
+      const isHybridOrEv = ['hybrid', 'plugin_hybrid', 'mild_hybrid', 'electric', 'hydrogen'].includes(gi.fuel);
+      const envLevyBadgeHtml = (isEuro4Or5 && isHybridOrEv && (sMid.envLevyEur || 0) === 0)
+        ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;background:rgba(4,120,87,0.12);color:#047857;border:1px solid rgba(4,120,87,0.3);">✓ €0 ENV. LEVY (HYBRID EXEMPT ν. 4710/2020 Art. 5 §3)</span>`
+        : '';
+
       // Tab 1: Statutory Customs Valuation Table (2-column Exact with VIN/Plate, 4-column Low/Mid/High Bracket without VIN)
       calcBreakdownContainer.innerHTML = `
         ${banBanner}
+        ${salvageBannerHtml}
+        ${cliffBannerHtml}
         <div style="display:flex;justify-content:space-between;align-items:center;background:${isExact ? 'rgba(16,185,129,0.08)' : 'var(--bg-subtle)'};border:1px solid ${isExact ? 'rgba(16,185,129,0.35)' : 'var(--border-strong)'};padding:8px 12px;margin-bottom:8px;border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:11px;flex-wrap:wrap;gap:6px;">
           <span><strong>Category:</strong> ${gi.categoryLabel || 'Passenger Car (87.03)'} • Δ.Κ. ${gi.tariffCode || '87.03'} (${gi.lawRef || 'ν. 5222/2025'})</span>
           <span style="padding:2px 8px;border-radius:3px;font-weight:700;background:${isExact ? '#047857' : '#b45309'};color:#fff;">
-            ${isExact ? '✓ EXACT VIN VALUATION' : 'BRACKET RANGE (NO VIN)'}
+            ${isExact ? '✓ EXACT VIN / TRIM VALUATION' : 'BRACKET RANGE (SELECT GREEK TRIM OR ENTER VIN)'}
           </span>
         </div>
         <div class="table-scroll-wrap">
@@ -3842,8 +3923,13 @@
           <tbody>
             <tr>
               <td>
-                <strong>1. Greek Pre-Tax List / Wholesale Base (ΛΤΠΦ)</strong><br/>
-                <span style="font-size:11px;color:var(--ink-500);">${gi.listPriceSource || ''}</span>
+                <strong>1. Greek Pre-Tax List / Wholesale Base (ΛΤΠΦ — ICISnet Κωδ. 832)</strong>
+                ${gi.hasVerifiedLtpf
+                  ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;background:rgba(4,120,87,0.12);color:#047857;border:1px solid rgba(4,120,87,0.3);">✓ VERIFIED GREEK / OEM ΛΤΠΦ</span>`
+                  : `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;background:rgba(180,83,9,0.12);color:#b45309;border:1px solid rgba(180,83,9,0.3);">⚠ ESTIMATED BENCHMARK PROXY</span>`
+                }<br/>
+                <span style="font-size:11px;color:var(--ink-500);">${gi.listPriceSource || ''} • <a href="https://www.aade.gr/timokatalogoi" target="_blank" rel="noopener" style="color:var(--accent-navy);text-decoration:underline;">Official AADE Importer Pricelists ↗</a></span>
+                ${trimPillsHtml}
               </td>
               ${isExact ? `
                 <td class="num"><strong>${fmtEur(sMid.listPriceEur)}</strong></td>
@@ -3857,6 +3943,7 @@
               <td>
                 <strong>2. Optional Factory Equipment (Extras — Α.1043/2025)</strong><br/>
                 <span style="font-size:11px;color:var(--ink-500);">${gi.extrasRange?.note || 'Added to ΛΤΠΦ before depreciation'}</span>
+                ${buildSheetHtml}
               </td>
               ${isExact ? `
                 <td class="num">+ ${fmtEur(sMid.extrasEur)}</td>
@@ -3868,8 +3955,8 @@
             </tr>
             <tr>
               <td>
-                <strong>3. Pre-Depreciation Base &amp; Bracket Rate</strong><br/>
-                <span style="font-size:11px;color:var(--ink-500);">${gi.fuel === 'electric' || gi.fuel === 'hydrogen' ? 'Drivetrain: Pure Electric BEV (0 cc — Zero Combustion Displacement)' : `Displacement: ${gi.cc || 1998} cc`}${gi.category === 'bus' ? ` • Seats: ${gi.seats}` : gi.category?.startsWith('truck_') ? ` • GVW: ${gi.gvwKg} kg` : ''} (${sMid.priceBandRatePct}% base scale)</span>
+                <strong>3. Pre-Depreciation Base &amp; Bracket Rate (Πεδίο 832 ICISnet)</strong><br/>
+                <span style="font-size:11px;color:var(--ink-500);">${gi.fuel === 'electric' || gi.fuel === 'hydrogen' ? 'Drivetrain: Pure Electric BEV (0 cc — Zero Combustion Displacement)' : `Displacement: ${gi.cc || 1998} cc`}${gi.category === 'bus' ? ` • Seats: ${gi.seats}` : gi.category?.startsWith('truck_') ? ` • GVW: ${gi.gvwKg} kg` : ''} (${sMid.priceBandRatePct}% progressive base scale)</span>
               </td>
               ${isExact ? `
                 <td class="num">${fmtEur(sMid.baseValueEur)}</td>
@@ -3881,8 +3968,8 @@
             </tr>
             <tr>
               <td>
-                <strong>4. Statutory Depreciation &amp; Taxable Value (Φορολογητέα Αξία)</strong><br/>
-                <span style="font-size:11px;color:var(--ink-500);">Body: ${(gi.body || 'sedan').toUpperCase()} • Age: -${sMid.ageDepPct}% (${sMid.ageMonths}m) • High-km deduction: -${sMid.kmDepPct}%</span>
+                <strong>4. Statutory Depreciation &amp; Taxable Value (Φορολογητέα Αξία — Πεδίο 849)</strong><br/>
+                <span style="font-size:11px;color:var(--ink-500);">Body: ${(gi.body || 'sedan').toUpperCase()} • Age (Α): -${sMid.ageDepPct}% (${sMid.ageMonths}m) • High-km (Β): -${sMid.kmDepPct}% • <strong>Combined (Γ = Πεδίο 849): -${sMid.totalDepPct ?? sMid.ageDepPct}%</strong></span>
               </td>
               ${isExact ? `
                 <td class="num"><strong>${fmtEur(sMid.taxableEur)}</strong></td>
@@ -3894,7 +3981,7 @@
             </tr>
             <tr>
               <td>
-                <strong>5. Effective Tax Multiplier &amp; Statutory Relief</strong><br/>
+                <strong>5. Effective Tax Multiplier &amp; Statutory Relief</strong>${envLevyBadgeHtml}<br/>
                 <span style="font-size:11px;color:var(--ink-500);">${sMid.euroLabel} • ${sMid.exemptionLabel}</span>
               </td>
               <td class="num" colspan="${isExact ? 1 : 3}">${sMid.co2}g CO₂ · <strong>${sMid.effectiveRatePct}%</strong></td>
@@ -4048,6 +4135,9 @@
         gvwKg: document.getElementById('calcGvw').value,
         vatRegime: document.getElementById('calcVatRegime').value,
         listPriceEur: document.getElementById('calcListPrice').value,
+        greekRetailEur: document.getElementById('calcGreekRetail') ? document.getElementById('calcGreekRetail').value : '',
+        greekTrimKey: document.getElementById('calcGreekTrimKey') ? document.getElementById('calcGreekTrimKey').value : '',
+        buildSheetText: document.getElementById('calcBuildSheetText') ? document.getElementById('calcBuildSheetText').value : '',
         extrasEur: document.getElementById('calcExtrasManual').value,
         shippingEur: document.getElementById('calcShipping').value,
       });
@@ -4146,7 +4236,7 @@
           <div>${checkBadge}</div>
         </div>
         <div style="color:var(--accent-forest);margin-top:4px;">
-          <strong>✓ Exact Statutory Valuation Locked:</strong> ${d.variant || `${d.make || ''} ${d.model || ''}`} • ${d.cc || '—'} cc • ${epa?.co2Gkm ?? d.co2 ?? '—'}g CO₂ ${(d.listPriceEur || rdw?.rdwCatalogPriceEur) ? `• <strong>Factory Pre-Tax ΛΤΠΦ: €${(d.listPriceEur || rdw?.rdwCatalogPriceEur).toLocaleString()}</strong>` : ''}
+          <strong>✓ Exact Statutory Valuation Locked:</strong> ${d.variant || `${d.make || ''} ${d.model || ''}`} • ${d.cc || '—'} cc • ${epa?.co2Gkm ?? d.co2 ?? '—'}g CO₂ ${(d.listPriceEur || rdw?.rdwNetPreTaxEur || rdw?.rdwCatalogPriceEur) ? `• <strong>Factory Pre-Tax ΛΤΠΦ: €${(d.listPriceEur || rdw?.rdwNetPreTaxEur || Math.round((rdw?.rdwCatalogPriceEur || 0) * 0.74)).toLocaleString()}</strong>` : ''}
         </div>
         ${buildSheetBlock}
         ${epaAndNcapBlock}
@@ -4187,6 +4277,8 @@
       if (d.seats || d.rdwRegistry?.seats) document.getElementById('calcSeats').value = d.seats || d.rdwRegistry.seats;
       if (d.listPriceEur) {
         document.getElementById('calcListPrice').value = d.listPriceEur;
+      } else if (d.rdwRegistry?.rdwNetPreTaxEur) {
+        document.getElementById('calcListPrice').value = d.rdwRegistry.rdwNetPreTaxEur;
       } else if (d.rdwRegistry?.rdwCatalogPriceEur) {
         document.getElementById('calcListPrice').value = Math.round(d.rdwRegistry.rdwCatalogPriceEur * 0.74);
       }
@@ -4473,6 +4565,8 @@
       document.getElementById('calcGvw').value = p.gvw;
       document.getElementById('calcVatRegime').value = p.vatRegime;
       document.getElementById('calcListPrice').value = p.listPrice;
+      const grRetEl = document.getElementById('calcGreekRetail');
+      if (grRetEl) grRetEl.value = '';
       const statusEl = document.getElementById('vinDecodeStatus');
       statusEl.style.display = 'block';
       statusEl.innerHTML = `<strong>Loaded Archetype Preset:</strong> ${p.title} • VIN: <code>${p.vin}</code>`;
@@ -4498,6 +4592,8 @@
       document.getElementById('calcGvw').value = gi.gvwKg || 2000;
       document.getElementById('calcVatRegime').value = item.vatDeductible ? 'eu_vat_invoice' : item.marginScheme ? 'margin_scheme' : 'auto';
       document.getElementById('calcListPrice').value = item.decodedVin?.listPriceEur || '';
+      const grRetEl2 = document.getElementById('calcGreekRetail');
+      if (grRetEl2) grRetEl2.value = '';
       document.getElementById('calcExtrasManual').value = '';
       document.getElementById('calcShipping').value = '';
       document.getElementById('calcListingUrl').value = item.url || '';
@@ -5341,7 +5437,17 @@
       clearTimeout(calcInputDebounceTimer);
       calcInputDebounceTimer = setTimeout(syncCalculatorTitleSpecs, 260);
     });
-    for (const calcFieldId of ['calcPrice', 'calcReg', 'calcKm', 'calcCc', 'calcCo2', 'calcListPrice', 'calcExtrasManual']) {
+    window.selectGreekTrimTier = function(trimKey) {
+      const sel = document.getElementById('calcGreekTrimKey');
+      if (sel) sel.value = trimKey;
+      const lp = document.getElementById('calcListPrice');
+      if (lp) lp.value = '';
+      const gr = document.getElementById('calcGreekRetail');
+      if (gr) gr.value = '';
+      fetchCustomCalc();
+    };
+
+    for (const calcFieldId of ['calcPrice', 'calcReg', 'calcKm', 'calcCc', 'calcCo2', 'calcListPrice', 'calcGreekRetail', 'calcGreekTrimKey', 'calcBuildSheetText', 'calcExtrasManual']) {
       const el = document.getElementById(calcFieldId);
       if (el) {
         el.addEventListener('change', fetchCustomCalc);

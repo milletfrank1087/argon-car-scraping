@@ -10,6 +10,8 @@ import {
   COUNTRY_CONFIG,
   FACTORY_OPTIONS_CATALOG,
   calculateGreekImport,
+  searchGreekImporterPricelists,
+  parseOemBuildSheetToGreekExtras,
 } from './greek-import-calc.mjs';
 import {
   cleanVin,
@@ -276,6 +278,8 @@ function applyScannedDetailToItem(item, scanned) {
   }
   if (scanned.rdwCatalogPriceEur && !item.rdwCatalogPriceEur) {
     item.rdwCatalogPriceEur = scanned.rdwCatalogPriceEur;
+    if (scanned.brutoBpmEur) item.brutoBpmEur = scanned.brutoBpmEur;
+    if (scanned.rdwNetPreTaxEur) item.rdwNetPreTaxEur = scanned.rdwNetPreTaxEur;
     item._needsImportRecalc = true;
   }
   if (scanned.detectedOptionIds?.length && !item.detectedOptionIds?.length) {
@@ -333,6 +337,8 @@ async function enrichPortalListingsWithDetails(page, listings, maxItems = 6) {
             if (rdw.co2 != null && scanned.co2 == null) scanned.co2 = rdw.co2;
             if (rdw.seats) scanned.seats = rdw.seats;
             if (rdw.rdwCatalogPriceEur) scanned.rdwCatalogPriceEur = rdw.rdwCatalogPriceEur;
+            if (rdw.brutoBpmEur) scanned.brutoBpmEur = rdw.brutoBpmEur;
+            if (rdw.rdwNetPreTaxEur) scanned.rdwNetPreTaxEur = rdw.rdwNetPreTaxEur;
           }
         }
         adDetailCache.set(item.url, scanned);
@@ -3036,6 +3042,27 @@ if (isMainModule && cliQuery) {
         return;
       }
 
+      if (reqUrl.pathname === '/api/lookup-greek-ltpf') {
+        const params = Object.fromEntries(reqUrl.searchParams.entries());
+        const result = searchGreekImporterPricelists(params.q || params.title || '', {
+          year: Number(params.year || 2022),
+          trimKey: params.trimKey || '',
+        });
+        res.writeHead(200);
+        res.end(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      if (reqUrl.pathname === '/api/parse-buildsheet') {
+        const params = Object.fromEntries(reqUrl.searchParams.entries());
+        const result = parseOemBuildSheetToGreekExtras(params.text || '', {
+          regYear: Number(params.year || 2021),
+        });
+        res.writeHead(200);
+        res.end(JSON.stringify(result, null, 2));
+        return;
+      }
+
       if (reqUrl.pathname === '/api/calculate-import') {
         const params = Object.fromEntries(reqUrl.searchParams.entries());
         const decodedVin = params.vin
@@ -3085,6 +3112,9 @@ if (isMainModule && cliQuery) {
           fuel: params.fuel || undefined,
           body: params.body || undefined,
           listPriceEur: params.listPriceEur ? Number(params.listPriceEur) : undefined,
+          greekRetailEur: params.greekRetailEur ? Number(params.greekRetailEur) : undefined,
+          greekTrimKey: params.greekTrimKey || undefined,
+          buildSheetText: params.buildSheetText || undefined,
           extrasEur:
             params.extrasEur !== undefined && params.extrasEur !== ''
               ? Number(params.extrasEur)

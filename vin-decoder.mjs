@@ -7,6 +7,8 @@ import { webcrypto } from 'node:crypto';
 import {
   FACTORY_OPTIONS_CATALOG,
   MODEL_PROFILES,
+  lookupGreekImporterLtpf,
+  convertDutchRdwToNetLtpf,
   inferVehicleCategory,
   normalizeFuelType,
   inferBodyClass,
@@ -351,6 +353,11 @@ export async function lookupDutchRdwByKenteken(rawPlate) {
       cc: Number(v.cilinderinhoud || 0) || null,
       co2: Number(f.co2_uitstoot_gewogen || f.co2_uitstoot_gecombineerd || 0) || null,
       rdwCatalogPriceEur: Number(v.catalogusprijs || 0) || null,
+      rdwNetPreTaxEur: convertDutchRdwToNetLtpf(
+        Number(v.catalogusprijs || 0),
+        Number(v.bruto_bpm || 0),
+        f.brandstof_omschrijving || ''
+      ),
       seats: Number(v.aantal_zitplaatsen || 0) || null,
     };
     rdwPlateCache.set(cleanPlate, result);
@@ -980,17 +987,22 @@ export async function decodeVin(rawVin, fallbackYear = null, { fastLocal = false
     wmiEntry?.body ||
     (nhtsa?.bodyClass ? inferBodyClass(nhtsa.bodyClass) : 'sedan');
 
-  // Check if one of our MODEL_PROFILES matches the decoded make/model
+  // Check if one of our MODEL_PROFILES or GREEK_IMPORTER_LTPF_CATALOG matches the decoded make/model
   const combinedTitle = `${make} ${model} ${variant}`;
   const profile = MODEL_PROFILES.find((p) => p.matchRe.test(combinedTitle));
+  const greekImporterMatch = lookupGreekImporterLtpf(combinedTitle, modelYear);
   const isRoadster = /roadster|cabrio|spyder|convertible/i.test(combinedTitle);
 
   const listPriceEur =
     vdsMatch?.listPriceEur ||
-    (profile ? profile.listPriceRangeByYear(modelYear, isRoadster, combinedTitle).mid : null);
+    (profile
+      ? profile.listPriceRangeByYear(modelYear, isRoadster, combinedTitle).mid
+      : greekImporterMatch?.ltpfEur || null);
   const co2 =
     vdsMatch?.co2 ??
-    (profile ? profile.co2RangeByYear(modelYear, isRoadster, combinedTitle).mid : null);
+    (profile
+      ? profile.co2RangeByYear(modelYear, isRoadster, combinedTitle).mid
+      : greekImporterMatch?.co2 ?? null);
 
   const resultObj = {
     ok: true,
