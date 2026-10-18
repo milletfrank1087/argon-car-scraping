@@ -284,7 +284,7 @@
     }
 
     /* ==========================================================================
-       MERCURY SPLIT APPLICATION SHELL (304px Left Rail + Borderless White Stage)
+       MERCURY SPLIT APPLICATION SHELL (318px Left Rail + Borderless White Stage)
        ========================================================================== */
     .page-shell {
       display: grid;
@@ -295,7 +295,7 @@
 
     @media (min-width: 760px) {
       .page-shell {
-        grid-template-columns: 304px minmax(0, 1fr);
+        grid-template-columns: 318px minmax(0, 1fr);
         align-items: start;
       }
     }
@@ -304,7 +304,7 @@
     .dossier-rail {
       background: var(--bg-sidebar);
       border-bottom: 1px solid var(--border);
-      padding: 16px 16px;
+      padding: 15px 14px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -319,9 +319,12 @@
         top: 0;
         height: 100dvh;
         overflow-y: auto;
+        overflow-x: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-input) transparent;
         border-bottom: none;
         border-right: 1px solid var(--border);
-        padding: 16px 16px;
+        padding: 15px 14px;
       }
     }
 
@@ -394,12 +397,18 @@
       flex-shrink: 0;
     }
 
+    @keyframes statusPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(19, 121, 91, 0.45); }
+      50% { box-shadow: 0 0 0 4px rgba(19, 121, 91, 0); }
+    }
+
     .autosave-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
       background: var(--success);
       flex-shrink: 0;
+      animation: statusPulse 2.4s infinite ease-in-out;
     }
 
     /* 3-Mode Segmented Switcher (Matches spitogatos argon & PII) */
@@ -1076,37 +1085,100 @@
       transition: width 0.2s ease-out;
     }
 
-    /* Animated Shimmer Skeleton Cards */
+    /* Animated Shimmer Skeleton Cards & Institutional Micro-Motion */
     @keyframes skeletonShimmer {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    @keyframes cardEnter {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.992);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes modalBackdropIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes modalSheetIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes mobileSheetUp {
+      from {
+        opacity: 0.6;
+        transform: translateY(28px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .skeleton-shimmer {
-      background: linear-gradient(90deg, #F1F3F6 25%, #F8F9FB 50%, #F1F3F6 75%);
+      background: linear-gradient(90deg, #EDF0F5 25%, #F7F9FC 50%, #EDF0F5 75%);
       background-size: 200% 100%;
-      animation: skeletonShimmer 1.35s infinite linear;
+      animation: skeletonShimmer 1.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
       border-radius: 4px;
+    }
+
+    .skeleton-shimmer-dark {
+      background: linear-gradient(90deg, rgba(255,255,255,0.65) 25%, rgba(255,255,255,0.92) 50%, rgba(255,255,255,0.65) 75%);
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: var(--radius-xs);
     }
 
     .skeleton-card {
       background: #FFFFFF;
-      border: 1px dashed var(--border-input);
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      animation: cardEnter 240ms var(--ease-out) both;
     }
 
     .skeleton-media {
-      height: 156px;
+      height: 158px;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       font-family: var(--font-mono);
       font-size: 11px;
-      color: var(--fg-muted);
+      color: var(--fg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .skeleton-portal-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(6px);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 500;
+      color: var(--fg);
+      box-shadow: var(--shadow-xs);
     }
 
     /* ==========================================================================
@@ -1125,18 +1197,28 @@
       display: flex;
       flex-direction: column;
       position: relative;
-      transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+      transition:
+        border-color var(--dur-base) var(--ease-out),
+        box-shadow var(--dur-base) var(--ease-out),
+        transform var(--dur-base) var(--ease-out);
+      will-change: transform;
+    }
+
+    .vehicle-card.card-enter {
+      animation: cardEnter 280ms var(--ease-out) both;
+      animation-delay: var(--stagger-delay, 0ms);
     }
 
     .vehicle-card:hover {
       border-color: var(--border-hover);
       box-shadow: var(--shadow-dropdown);
+      transform: translateY(-2px);
     }
 
     .media-frame {
       position: relative;
       height: 158px;
-      background: var(--bg-subtle);
+      background: linear-gradient(135deg, #F1F3F7 0%, #F8F9FB 100%);
       overflow: hidden;
       border-bottom: 1px solid var(--border);
       border-radius: var(--radius-md) var(--radius-md) 0 0;
@@ -1147,6 +1229,18 @@
       height: 100%;
       object-fit: cover;
       display: block;
+      opacity: 0;
+      transition:
+        opacity 260ms var(--ease-out),
+        transform 420ms var(--ease-out);
+    }
+
+    .media-frame img.img-loaded {
+      opacity: 1;
+    }
+
+    .vehicle-card:hover .media-frame img.img-loaded {
+      transform: scale(1.035);
     }
 
     .media-placeholder {
@@ -1404,20 +1498,31 @@
       text-decoration: none;
     }
 
+    /* Tactile Button Press Feedback */
+    button:not(:disabled):active,
+    a.btn-source-link:active,
+    .portal-pill:active,
+    .preset-btn:active {
+      transform: translateY(1px);
+    }
+
     /* Customs Valuation Dossier Modal (Mercury / PII Style) */
     .modal-backdrop {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(20, 21, 26, 0.48);
-      backdrop-filter: blur(3px);
+      background: rgba(20, 21, 26, 0.52);
+      backdrop-filter: blur(4px);
       z-index: 100;
       align-items: center;
       justify-content: center;
       padding: 20px;
     }
 
-    .modal-backdrop.open { display: flex; }
+    .modal-backdrop.open {
+      display: flex;
+      animation: modalBackdropIn 180ms var(--ease-out) both;
+    }
 
     .dossier-modal {
       background: #FFFFFF;
@@ -1429,6 +1534,45 @@
       overflow-y: auto;
       overflow-x: hidden;
       box-shadow: var(--shadow-popover);
+      animation: modalSheetIn 240ms var(--ease-out) both;
+    }
+
+    .floating-top-btn {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 85;
+      height: 36px;
+      padding: 0 13px;
+      border-radius: 999px;
+      background: var(--ink-btn);
+      color: #FFFFFF;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: var(--shadow-dropdown);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px);
+      transition:
+        opacity 200ms var(--ease-out),
+        transform 200ms var(--ease-out),
+        visibility 200ms;
+    }
+
+    .floating-top-btn.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .floating-top-btn:hover {
+      background: var(--ink-btn-hover);
     }
 
     .dossier-header {
@@ -2249,10 +2393,28 @@
       .dossier-modal {
         width: 100vw !important;
         max-width: 100vw !important;
-        height: 100dvh;
-        max-height: 100dvh !important;
-        border-radius: 0 !important;
+        height: 96dvh;
+        max-height: 96dvh !important;
+        border-radius: 14px 14px 0 0 !important;
         border: none !important;
+        animation: mobileSheetUp 240ms var(--ease-out) both;
+      }
+
+      .dossier-header::before {
+        content: '';
+        display: block;
+        width: 36px;
+        height: 4px;
+        background: var(--border-hover);
+        border-radius: 999px;
+        margin: -4px auto 4px;
+      }
+
+      .floating-top-btn {
+        right: 14px;
+        bottom: 14px;
+        height: 34px;
+        font-size: 10.5px;
       }
 
       .dossier-header {
@@ -3127,26 +3289,54 @@
       URL.revokeObjectURL(url);
     };
 
+    let renderedCardKeysSet = new Set();
+
     function buildSkeletonCardsHtml(count = 6, pendingNames = []) {
       return Array.from({ length: count }).map((_, i) => {
         const portalLabel = pendingNames[i % Math.max(1, pendingNames.length)] || 'EU Portal';
+        const delayMs = Math.min(i * 35, 180);
         return `
-          <article class="skeleton-card">
+          <article class="skeleton-card" style="animation-delay:${delayMs}ms;" aria-hidden="true">
             <div class="skeleton-media skeleton-shimmer">
-              <span>⏳ Streaming ${portalLabel} + VIN Decoder...</span>
-            </div>
-            <div class="card-content" style="gap:10px;">
-              <div class="skeleton-shimmer" style="height:18px;width:82%;"></div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0;">
-                <div class="skeleton-shimmer" style="height:48px;"></div>
-                <div class="skeleton-shimmer" style="height:48px;"></div>
+              <div class="skeleton-shimmer-dark" style="position:absolute;top:8px;left:8px;width:96px;height:19px;"></div>
+              <div class="skeleton-shimmer-dark" style="position:absolute;top:8px;right:8px;width:64px;height:19px;"></div>
+              <div class="skeleton-portal-badge">
+                <span class="autosave-dot"></span>
+                <span>Streaming ${portalLabel}…</span>
               </div>
-              <div class="skeleton-shimmer" style="height:24px;width:94%;"></div>
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:4px;">
-                <div class="skeleton-shimmer" style="height:32px;"></div>
-                <div class="skeleton-shimmer" style="height:32px;"></div>
-                <div class="skeleton-shimmer" style="height:32px;"></div>
-                <div class="skeleton-shimmer" style="height:32px;"></div>
+            </div>
+            <div class="card-content">
+              <div class="card-header-row" style="flex-direction:row;justify-content:space-between;align-items:flex-start;gap:8px;">
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                  <div class="skeleton-shimmer" style="height:15px;width:84%;"></div>
+                  <div class="skeleton-shimmer" style="height:11px;width:66%;"></div>
+                </div>
+                <div class="skeleton-shimmer" style="height:20px;width:46px;border-radius:4px;flex-shrink:0;"></div>
+              </div>
+              <div class="prop-metrics-grid">
+                <div class="pm-cell">
+                  <div class="pm-label">EU ASKING</div>
+                  <div class="skeleton-shimmer" style="height:14px;width:76%;margin-top:2px;"></div>
+                </div>
+                <div class="pm-cell">
+                  <div class="pm-label">GR CUSTOMS</div>
+                  <div class="skeleton-shimmer" style="height:14px;width:82%;margin-top:2px;"></div>
+                </div>
+                <div class="pm-cell">
+                  <div class="pm-label">LANDED GR</div>
+                  <div class="skeleton-shimmer" style="height:14px;width:80%;margin-top:2px;"></div>
+                </div>
+              </div>
+              <div class="tag-row" style="margin-top:auto;">
+                <div class="skeleton-shimmer" style="height:19px;width:118px;border-radius:3px;"></div>
+                <div class="skeleton-shimmer" style="height:19px;width:78px;border-radius:3px;"></div>
+              </div>
+              <div class="card-footer">
+                <div class="card-actions">
+                  <div class="skeleton-shimmer" style="height:34px;flex:1;border-radius:var(--radius-sm);"></div>
+                  <div class="skeleton-shimmer" style="height:34px;width:52px;border-radius:var(--radius-sm);"></div>
+                  <div class="skeleton-shimmer" style="height:34px;width:50px;border-radius:var(--radius-sm);"></div>
+                </div>
               </div>
             </div>
           </article>
@@ -3224,7 +3414,13 @@
         list.sort((a, b) => (a.priceEur ?? 9999999) - (b.priceEur ?? 9999999));
       }
 
+      let newCardIdx = 0;
       const cardsHtml = list.map((item, idx) => {
+        const cardKey = item.url || `${item.marketplace}:${item.id || idx}`;
+        const isNewCard = !renderedCardKeysSet.has(cardKey);
+        if (isNewCard) renderedCardKeysSet.add(cardKey);
+        const staggerDelay = isNewCard ? Math.min(newCardIdx++ * 22, 180) : 0;
+
         const gi = item.greekImport || {};
         const isGr = Boolean(gi.isDomesticGreek);
         const isExact = Boolean(gi.isExactValuation || item.vin || item.licensePlate);
@@ -3268,10 +3464,10 @@
         }
 
         return `
-          <article class="vehicle-card">
+          <article class="vehicle-card ${isNewCard ? 'card-enter' : ''}" style="--stagger-delay:${staggerDelay}ms;">
             <div class="media-frame">
               ${item.thumbnail
-                ? `<img src="${item.thumbnail}" alt="${(item.title || '').replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML='<div class=\\'media-placeholder\\'>No Image · ${item.marketplace}</div>'" />`
+                ? `<img src="${item.thumbnail}" alt="${(item.title || '').replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onload="this.classList.add('img-loaded')" onerror="this.parentElement.innerHTML='<div class=\\'media-placeholder\\'>No Image · ${item.marketplace}</div>'" />`
                 : `<div class="media-placeholder">No Image · ${item.marketplace}</div>`
               }
               <span class="tag-origin">${item.country || 'EU'} · ${item.marketplace}</span>
@@ -3431,6 +3627,7 @@
       const streamProgressFill = document.getElementById('streamProgressFill');
 
       pendingPortalsSet = new Set(sourceSelect.value === 'all' ? ALL_15_PORTALS : [sourceSelect.value]);
+      renderedCardKeysSet = new Set();
       currentData = { totalListingsReturned: 0, marketplaces: {}, listings: [] };
 
       streamBanner.classList.add('visible');
@@ -4288,12 +4485,33 @@
       }
       if (container) {
         container.innerHTML = `
-          <div class="receipt-box" style="text-align:center;padding:22px 16px;">
-            <div style="font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--fg);margin-bottom:4px;">
-              EXECUTING 15-MODULE UNIVERSAL VEHICLE INTELLIGENCE &amp; OPENROUTER SEMANTIC AUDIT…
+          <div class="receipt-box" style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+              <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--fg);">
+                <span class="autosave-dot"></span>
+                <span>EXECUTING 15-MODULE UNIVERSAL FORENSIC &amp; AI AUDIT…</span>
+              </div>
+              <span class="inst-tag indigo">OpenRouter · ${localStorage.getItem('argon_openrouter_model') || 'deepseek/deepseek-v4.1-flash'}</span>
             </div>
-            <div style="font-size:12px;color:var(--fg-secondary);">
-              Universal Portal &amp; AES-256-GCM Extractor · ISO 3779 &amp; Split-VIN Reconstruction · SalesHistory / Bid-Cars / BadVIN / Copart / IAAI Archives · 2-Phase Chronology &amp; Lie-Detector · OpenRouter LLM (${localStorage.getItem('argon_openrouter_model') || 'deepseek/deepseek-v4.1-flash'})
+            <div class="stream-track" style="height:4px;">
+              <div class="stream-fill skeleton-shimmer" style="width:100%;background:linear-gradient(90deg, var(--accent) 0%, var(--success) 50%, var(--accent) 100%);background-size:200% 100%;"></div>
+            </div>
+            <div class="forensic-two-col-grid" style="margin-top:2px;">
+              ${[
+                '01 / Global Salvage & Auction Archives (Copart · IAAI · Bid.Cars)',
+                '02 / ISO 3779 WMI/VDS/VIS & Split-VIN Reconstruction',
+                '03 / 2-Phase Odometer Chronology & Seller Lie-Detector',
+                '04 / Statutory Greek Customs & AI Executive Verdict'
+              ].map((modTitle) => `
+                <div class="receipt-box" style="background:#FFFFFF;padding:11px 12px;display:flex;flex-direction:column;gap:8px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <span style="font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--fg-secondary);">${modTitle}</span>
+                    <div class="skeleton-shimmer" style="width:52px;height:16px;border-radius:3px;"></div>
+                  </div>
+                  <div class="skeleton-shimmer" style="height:12px;width:92%;"></div>
+                  <div class="skeleton-shimmer" style="height:12px;width:74%;"></div>
+                </div>
+              `).join('')}
             </div>
           </div>
         `;
@@ -4981,7 +5199,28 @@
       const modelsRaw = document.getElementById('radarModelsInput').value.trim();
       btn.disabled = true;
       btn.textContent = 'Scanning 15 Portals Across Watchlist…';
-      container.innerHTML = `<div class="info-card skeleton-shimmer" style="padding:18px;font-family:var(--font-mono);">⏳ Querying 15 European portals for [${modelsRaw}] and benchmarking against Greek domestic (car.gr) floor prices…</div>`;
+      container.innerHTML = `
+        <div class="receipt-box" style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--fg);">
+              <span class="autosave-dot"></span>
+              <span>Scanning 15 European Portals for [${modelsRaw}] vs. Greek Domestic (car.gr) Floor…</span>
+            </div>
+            <span class="inst-tag ok">LIVE RADAR SCAN</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            ${Array.from({ length: 5 }).map(() => `
+              <div style="display:grid;grid-template-columns:1.2fr 0.8fr 1fr 1fr 1.2fr;gap:10px;background:#FFFFFF;border:1px solid var(--border);padding:9px 12px;border-radius:var(--radius-xs);">
+                <div class="skeleton-shimmer" style="height:13px;width:80%;"></div>
+                <div class="skeleton-shimmer" style="height:13px;width:65%;"></div>
+                <div class="skeleton-shimmer" style="height:13px;width:75%;"></div>
+                <div class="skeleton-shimmer" style="height:13px;width:75%;"></div>
+                <div class="skeleton-shimmer" style="height:13px;width:85%;"></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
       try {
         const r = await fetch(`/api/arbitrage-radar?models=${encodeURIComponent(modelsRaw)}`);
         const d = await r.json();
@@ -5208,6 +5447,26 @@
     }
 
     initWorkspaceAuth();
+
+    // --- Floating Back-to-Top Pill for Long Cohorts (Desktop & Mobile) ---
+    const floatingTopBtn = document.createElement('button');
+    floatingTopBtn.type = 'button';
+    floatingTopBtn.id = 'floatingTopBtn';
+    floatingTopBtn.className = 'floating-top-btn';
+    floatingTopBtn.setAttribute('aria-label', 'Scroll back to top');
+    floatingTopBtn.innerHTML = '<span>↑ Top</span>';
+    floatingTopBtn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    document.body.appendChild(floatingTopBtn);
+
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 460) {
+        floatingTopBtn.classList.add('visible');
+      } else {
+        floatingTopBtn.classList.remove('visible');
+      }
+    }, { passive: true });
   </script>
 </body>
 </html>
