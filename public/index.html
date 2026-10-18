@@ -3017,20 +3017,24 @@
                 <label class="control-label">Customs Category (ν. 5222/2025)</label>
                 <select id="calcCategory">
                   <option value="passenger">Passenger Car / Supercar (Ε.Ι.Χ. 87.03)</option>
-                  <option value="motorhome">Motorhome / Camper (75% Relief)</option>
-                  <option value="motorcycle">Motorcycle (Δ.Κ. 87.11 — 0%–25%)</option>
-                  <option value="quadricycle">ATV / Quad / Microcar (L-Cat)</option>
-                  <option value="quadricycle_cargo">Cargo Quad / Trike (L-Cat)</option>
+                  <option value="motorhome">Motorhome / Camper (75% Relief — Άρθ. 136 §7)</option>
+                  <option value="motorcycle">Motorcycle / Scooter (Δ.Κ. 87.11 — 0%–25%)</option>
+                  <option value="quadricycle">ATV / Quad / Microcar (L-Cat 0%–11%)</option>
+                  <option value="quadricycle_cargo">Cargo Quad / Trike (L-Cat 0%–10%)</option>
                   <option value="truck_double_cab">Double-Cab Pickup ≤3.5t (8%)</option>
                   <option value="truck_pickup_open">Open Pickup / Truck ≤3.5t (8%)</option>
                   <option value="truck_van_closed">Closed Panel Van ≤3.5t (10%)</option>
+                  <option value="truck_van_from_passenger">Van Converted from Passenger Car (30% — Άρθ. 139 §2)</option>
                   <option value="truck_heavy">Heavy Truck &gt;3.5t / Tractor (5%)</option>
                   <option value="truck_chassis">Truck Chassis-Cab (5%)</option>
-                  <option value="bus">Bus / Coach &gt;9 Seats (Δ.Κ. 87.02)</option>
-                  <option value="taxi">Public-Use Taxi Ε.Δ.Χ. (Pays 13%)</option>
-                  <option value="multichild">Multi-Child Family (Άρθ. 149)</option>
+                  <option value="bus">Bus / Coach &gt;9 Seats (Δ.Κ. 87.02 — 1-Yr Road Tax)</option>
+                  <option value="taxi">Public-Use Taxi Ε.Δ.Χ. (Pays 13% — Άρθ. 138)</option>
+                  <option value="multichild">Multi-Child Family (100% ≤2000cc / 50% &gt;2000cc — Άρθ. 149)</option>
+                  <option value="disabled_amea">Disabled Persons ΑμεΑ (100% ≤1650cc / €0 Road Tax — Άρθ. 148)</option>
+                  <option value="repatriation">Repatriation / Μετοικεσία (80% Relief ≤2000cc — Άρθ. 148 §3α)</option>
+                  <option value="emergency_special">Ambulance / Hearse / Civil Prot. (€53 / €0 — Άρθ. 141 &amp; 148)</option>
                   <option value="historic">Historic ≥30 Years (97.05 — 0%)</option>
-                  <option value="moik">Custom / Kit Car Μ.Ο.Ι.Κ.</option>
+                  <option value="moik">Custom / Kit Car Μ.Ο.Ι.Κ. (€500–€1,500)</option>
                 </select>
               </div>
               <div class="control-group span-2">
@@ -3085,11 +3089,13 @@
               <div class="control-group">
                 <label class="control-label">Drivetrain</label>
                 <select id="calcFuel">
-                  <option value="plugin_hybrid">PHEV (75% Relief ≤50g)</option>
-                  <option value="hybrid">Full Hybrid (50% Relief)</option>
-                  <option value="petrol">Petrol / Mild-Hybrid</option>
-                  <option value="diesel">Diesel</option>
-                  <option value="electric">Electric BEV (100%)</option>
+                  <option value="plugin_hybrid">PHEV (75% Relief ≤50g / 50% &gt;50g)</option>
+                  <option value="hybrid">Full Hybrid HEV (50% Relief V32/V33)</option>
+                  <option value="mild_hybrid">Mild Hybrid MHEV 48V (50% Relief V32/V33)</option>
+                  <option value="petrol">Petrol (ICE)</option>
+                  <option value="diesel">Diesel (ICE)</option>
+                  <option value="lpg_cng">Bi-Fuel LPG / CNG (Gas CO₂ — Άρθ. 136 §4)</option>
+                  <option value="electric">Electric BEV (100% Exempt)</option>
                 </select>
               </div>
               <div class="control-group">
@@ -5139,9 +5145,12 @@
         if (fuel === 'plugin_hybrid') {
           if (curCc === 0 || curCc > 4000) ccEl.value = 1499;
           if (curCo2 === 0 || curCo2 > 80) co2El.value = 42;
-        } else if (fuel === 'hybrid') {
-          if (curCc === 0) ccEl.value = 1998;
-          if (curCo2 === 0 || curCo2 <= 50 || curCo2 > 180) co2El.value = 110;
+        } else if (fuel === 'hybrid' || fuel === 'mild_hybrid') {
+          if (curCc === 0) ccEl.value = 1498;
+          if (curCo2 === 0 || curCo2 <= 50 || curCo2 > 180) co2El.value = fuel === 'mild_hybrid' ? 128 : 105;
+        } else if (fuel === 'lpg_cng') {
+          if (curCc === 0) ccEl.value = 999;
+          if (curCo2 === 0 || curCo2 > 160) co2El.value = 112;
         } else if (fuel === 'petrol') {
           if (curCc === 0 || curCc === 1499) ccEl.value = 1998;
           if (curCo2 <= 60) co2El.value = 165;
@@ -5159,6 +5168,7 @@
       const t = titleEl.value.trim().toLowerCase();
       if (!t) return;
 
+      const catEl = document.getElementById('calcCategory');
       const ccEl = document.getElementById('calcCc');
       const co2El = document.getElementById('calcCo2');
       const fuelEl = document.getElementById('calcFuel');
@@ -5183,12 +5193,14 @@
       }
 
       if (/hurac[aá]n|\blp\s*610\b|\blp\s*580\b|\blp\s*640\b/.test(t)) {
+        if (catEl) catEl.value = 'passenger';
         ccEl.value = 5204;
         co2El.value = /\bsto\b|\bsterrato\b|\btecnica\b/.test(t) ? 331 : (regYear >= 2019 || /\bevo\b/.test(t)) ? 332 : /\bperformante\b/.test(t) ? 314 : 280;
         fuelEl.value = 'petrol';
         bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
         if (lpEl) lpEl.value = '';
       } else if (/\burus\b/.test(t)) {
+        if (catEl) catEl.value = 'passenger';
         ccEl.value = 3996;
         const isSe = /\bse\b|\bphev\b/.test(t);
         co2El.value = isSe ? 51 : 320;
@@ -5196,10 +5208,68 @@
         bodyEl.value = 'suv';
         if (lpEl) lpEl.value = '';
       } else if (/\baventador\b/.test(t)) {
+        if (catEl) catEl.value = 'passenger';
         ccEl.value = 6498;
         co2El.value = 398;
         fuelEl.value = 'petrol';
         bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b(rx-?8|rx-?7)\b/.test(t)) {
+        if (catEl) catEl.value = 'passenger';
+        ccEl.value = 2616;
+        co2El.value = 284;
+        fuelEl.value = 'petrol';
+        bodyEl.value = 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\bmclaren\b/.test(t)) {
+        if (catEl) catEl.value = 'passenger';
+        const isArtura = /artura/.test(t);
+        ccEl.value = isArtura ? 2993 : /720|750|765/.test(t) ? 3994 : 3799;
+        co2El.value = isArtura ? 104 : 265;
+        fuelEl.value = isArtura ? 'plugin_hybrid' : 'petrol';
+        bodyEl.value = isRoadster ? 'cabrio' : 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b(r\s*1250\s*gs|r\s*1300\s*gs|s\s*1000\s*rr|mt-?07|mt-?09|tmax|panigale|multistrada|africa\s+twin|pcx\s*125|sh\s*125|sh\s*350|harley)\b/.test(t)) {
+        if (catEl) catEl.value = 'motorcycle';
+        ccEl.value = /125\b/.test(t) ? 125 : /350\b/.test(t) ? 330 : /tmax/.test(t) ? 562 : /mt-?07/.test(t) ? 689 : /mt-?09/.test(t) ? 890 : /harley/.test(t) ? 1868 : 1254;
+        co2El.value = 110;
+        fuelEl.value = 'petrol';
+        bodyEl.value = 'coupe';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b(ranger|hilux|amarok|navara|l200|d-?max)\b/.test(t)) {
+        if (catEl) catEl.value = 'truck_double_cab';
+        ccEl.value = 1996;
+        co2El.value = 210;
+        fuelEl.value = 'diesel';
+        bodyEl.value = 'suv';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b(sprinter|crafter|transit\s+custom|vito\s+kasten|ducato\s+kasten|caddy\s+cargo)\b/.test(t)) {
+        if (catEl) catEl.value = 'truck_van_closed';
+        ccEl.value = 1995;
+        co2El.value = 195;
+        fuelEl.value = 'diesel';
+        bodyEl.value = 'mpv';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b(hymer|knaus|weinsberg|adria\s+twin|camper|wohnmobil|motorhome)\b/.test(t)) {
+        if (catEl) catEl.value = 'motorhome';
+        ccEl.value = 2184;
+        co2El.value = 215;
+        fuelEl.value = 'diesel';
+        bodyEl.value = 'mpv';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b(actros|scania|volvo\s+fh|man\s+tgx|daf\s+xf)\b/.test(t)) {
+        if (catEl) catEl.value = 'truck_heavy';
+        ccEl.value = 12800;
+        co2El.value = 0;
+        fuelEl.value = 'diesel';
+        bodyEl.value = 'suv';
+        if (lpEl) lpEl.value = '';
+      } else if (/\b(tourismo|setra|travego|irizar)\b/.test(t)) {
+        if (catEl) catEl.value = 'bus';
+        ccEl.value = 10677;
+        co2El.value = 0;
+        fuelEl.value = 'diesel';
+        bodyEl.value = 'mpv';
         if (lpEl) lpEl.value = '';
       } else if (/\br8\b/.test(t)) {
         ccEl.value = 5204;

@@ -24,8 +24,10 @@
  * 5. ν. 5177/2025 Βιβλίο 10 Άρθρα 53–56 & ν. 4850/2021 Άρθρο 36: Ετήσια Τέλη Κυκλοφορίας όλων των κατηγοριών
  */
 
+import { inferUniversalSpecsFromText } from './universal-vehicle-specs.mjs';
+
 export const LAW_VERSION =
-  'ν. 5222/2025 Άρθ. 135–158 • ν. 5313/2026 Άρθ. 10 • ΑΑΔΕ Α.1043/2025 & Α.1108/2025 • ν. 5177/2025';
+  'ν. 5222/2025 Άρθ. 135–158 • ν. 5313/2026 Άρθ. 10–11 • ΑΑΔΕ Α.1203/2019–Α.1019/2026 • Ε.2036 & Ε.2039/2026 • ν. 5177/2025';
 
 export const VEHICLE_CATEGORIES = [
   {
@@ -47,7 +49,7 @@ export const VEHICLE_CATEGORIES = [
     label: 'Motorcycle / Scooter (Μοτοσικλέτα — Δ.Κ. 87.11)',
     shortLabel: 'Motorcycle (87.11)',
     tariffCode: '87.11',
-    lawRef: 'ν. 5222/2025 Άρθ. 140 §1–2 (0%–25% by cc)',
+    lawRef: 'ν. 5222/2025 Άρθ. 140 §1–4 (0%–25% by cc)',
   },
   {
     id: 'quadricycle',
@@ -61,7 +63,7 @@ export const VEHICLE_CATEGORIES = [
     label: 'Utility Cargo Quad / Trike (Φορτηγό Τρίκυκλο/Τετράκυκλο L-Cat)',
     shortLabel: 'Cargo Quad / Trike (L-Cat)',
     tariffCode: '87.04 (L-Cat)',
-    lawRef: 'ν. 5222/2025 Άρθ. 139 §1η (0% / 3% / 6% / 10% by cc)',
+    lawRef: 'ν. 5222/2025 Άρθ. 139 §1στ (0% / 3% / 6% / 10% by cc)',
   },
   {
     id: 'truck_double_cab',
@@ -83,6 +85,13 @@ export const VEHICLE_CATEGORIES = [
     shortLabel: 'Closed Panel Van ≤3.5t (10%)',
     tariffCode: '87.04',
     lawRef: 'ν. 5222/2025 Άρθ. 139 §1γ & §3 (10% Euro 6)',
+  },
+  {
+    id: 'truck_van_from_passenger',
+    label: 'Van Converted from Passenger Car (Κλειστό Φορτηγό από Μετατροπή Ε.Ι.Χ. — 30%)',
+    shortLabel: 'Converted Passenger Van (30%)',
+    tariffCode: '87.04 (ex-87.03)',
+    lawRef: 'ν. 5222/2025 Άρθ. 139 §2 (3×10% = 30% επί Φορ. Αξίας Επιβατικού)',
   },
   {
     id: 'truck_heavy',
@@ -120,6 +129,27 @@ export const VEHICLE_CATEGORIES = [
     lawRef: 'ν. 5222/2025 Άρθ. 149 (100% απαλλαγή ≤2000cc, 50% >2000cc)',
   },
   {
+    id: 'disabled_amea',
+    label: 'Disabled Persons ΑμεΑ (Ανάπηροι Πολίτες — 100% ≤1650cc / 80% >1650cc)',
+    shortLabel: 'Disabled ΑμεΑ (Άρθ. 148 §2–4)',
+    tariffCode: '87.03 (Απαλλαγή ΑμεΑ)',
+    lawRef: 'ν. 5222/2025 Άρθ. 148 §2–4 & ν. 490/1976 (100% ≤1.650cc, €0 Τέλη)',
+  },
+  {
+    id: 'repatriation',
+    label: 'Transfer of Residence / Repatriation (Μετοικεσία — 80% Relief ≤2000cc)',
+    shortLabel: 'Repatriation / Μετοικεσία (80% Off)',
+    tariffCode: '87.03 (Μετοικούντες)',
+    lawRef: 'ν. 5222/2025 Άρθ. 148 §3α & Άρθ. 157 / Δ.245/1988 (80% Απαλλαγή ≤2.000cc)',
+  },
+  {
+    id: 'emergency_special',
+    label: 'Ambulance / Hearse / Civil Protection (Ασθενοφόρο / Νεκροφόρα / ΕΚΑΒ)',
+    shortLabel: 'Ambulance / Hearse / Civil Prot.',
+    tariffCode: '87.03 / 87.05',
+    lawRef: 'ν. 5222/2025 Άρθ. 141 §1 (€53) & Άρθ. 148 §10–13 (0% ΕΚΑΒ/Πολ. Προστασία)',
+  },
+  {
     id: 'historic',
     label: 'Historic / Antique Vehicle ≥30 Years (Ιστορικό Όχημα / Αντίκα — Δ.Κ. 97.05)',
     shortLabel: 'Historic ≥30 yrs (0% Tax & Duty)',
@@ -142,29 +172,53 @@ export function inferVehicleCategory(text = '', regYear = null) {
   const s = String(text).toLowerCase();
   const currentYear = new Date().getFullYear();
 
-  if (/\b(wohnmobil|camper|motorhome|τροχόσπιτο|hymer|knaus|weinsberg|adria\s+twin|ducato\s+camper|california\s+ocean|pössl|carado|bürstner|dethleffs)\b/i.test(s)) {
+  if (/\b(ασθενοφόρο|νεκροφόρα|ambulance|krankenwagen|rettungswagen|leichwagen|hearse|bestattungswagen|πυροσβεστικ|feuerwehr)\b/i.test(s)) {
+    return 'emergency_special';
+  }
+  if (/\b(μετοικεσία|μετοικούντ|repatriation|transfer\s+of\s+residence)\b/i.test(s)) {
+    return 'repatriation';
+  }
+  if (/\b(αμεα|ανάπηρ|αναπηρικ|disabled\s+exemption)\b/i.test(s)) {
+    return 'disabled_amea';
+  }
+  if (/\b(πολύτεκν|τρίτεκν|multichild)\b/i.test(s)) {
+    return 'multichild';
+  }
+  if (/\b(ταξί|taxi\b|ε\.?δ\.?χ\.?)\b/i.test(s)) {
+    return 'taxi';
+  }
+  if (/\b(wohnmobil|camper|motorhome|τροχόσπιτο|hymer|knaus|weinsberg|adria\s+twin|ducato\s+camper|california\s+ocean|pössl|carado|bürstner|dethleffs|chausson|rapido|laika|westfalia|marco\s+polo\s+horizon)\b/i.test(s)) {
     return 'motorhome';
   }
   if (/\b(omnibus|reisebus|linienbus|minibus|autobus|λεωφορείο|πούλμαν|setra\b|tourismo|travego|citaro|irizar|neoplan|vanhool|lion'?s\s+coach|crossway|sprinter\s+transfer|sprinter\s+travel)\b/i.test(s)) {
     return 'bus';
   }
-  if (/\b(actros|arocs|atego|sattelzugmaschine|scania\s+[rgs]\s*\d{3}|volvo\s+fh|volvo\s+fm|man\s+tgx|man\s+tgs|daf\s+xf|daf\s+xg|iveco\s+s-way|iveco\s+stralis|renault\s+t\s*\d{3}|τράκτορας)\b/i.test(s)) {
+  if (/\b(actros|arocs|atego|sattelzugmaschine|scania\s+[rgsp]\s*\d{3}|volvo\s+fh|volvo\s+fm|man\s+tgx|man\s+tgs|man\s+tgm|daf\s+xf|daf\s+xg|daf\s+cf|iveco\s+s-way|iveco\s+stralis|iveco\s+eurocargo|renault\s+t\s*\d{3}|τράκτορας)\b/i.test(s)) {
     return 'truck_heavy';
   }
-  if (/\b(raptor|hilux|amarok|navara|l200|ranger\s+wildtrak|d-?max|f-?150|ram\s+1500|gladiator|doppelkabine|double\s*cab|διπλοκάμπινο)\b/i.test(s)) {
+  if (/\b(raptor|hilux|amarok|navara|l200|ranger\s+(?:wildtrak|xlt|limited|platinum|raptor)|d-?max|f-?150|ram\s+1500|gladiator|doppelkabine|double\s*cab|crew\s*cab|διπλοκάμπινο)\b/i.test(s)) {
     return 'truck_double_cab';
   }
-  if (/\b(pritsche|single\s*cab|king\s*cab|ανοικτό\s+φορτηγό|pick-?up\s+single)\b/i.test(s)) {
+  if (/\b(pritsche|single\s*cab|king\s*cab|ανοικτό\s+φορτηγό|pick-?up\s+single|flatbed)\b/i.test(s)) {
     return 'truck_pickup_open';
   }
-  if (/\b(kastenwagen|panel\s+van|furgone|fourgon|κλειστό\s+φορτηγό|sprinter\s+\d{3}|vito\s+kasten|crafter|transporter\s+t6|ducato\s+kasten|ford\s+transit\s+custom|iveco\s+daily\s+35|peugeot\s+boxer|renault\s+master|caddy\s+cargo)\b/i.test(s)) {
+  if (/\b(μετατροπή\s+επιβατικ|van\s+converted\s+from\s+passenger|pkw\s+umbau\s+lkw|furgone\s+da\s+autovettura)\b/i.test(s)) {
+    return 'truck_van_from_passenger';
+  }
+  if (/\b(fahrgestell|chassis\s*cab|βάση\s+φορτηγού)\b/i.test(s)) {
+    return 'truck_chassis';
+  }
+  if (/\b(kastenwagen|panel\s+van|furgone|fourgon|κλειστό\s+φορτηγό|sprinter\s+\d{3}|vito\s+kasten|crafter|transporter\s+t[567]|ducato\s+kasten|ford\s+transit\s+(?:custom|connect|courier|350)|iveco\s+daily\s+35|peugeot\s+(?:boxer|expert|partner\s+cargo)|renault\s+(?:master|trafic\s+furgon|kangoo\s+rapid)|citro[eë]n\s+(?:jumper|jumpy|berlingo\s+van)|opel\s+(?:vivaro|movano|combo\s+cargo)|vw\s+caddy\s+cargo|caddy\s+kasten)\b/i.test(s)) {
     return 'truck_van_closed';
   }
-  if (/\b(quad|atv|buggy|utv|can-?am|polaris\s+sportsman|polaris\s+rzr|cf\s*moto|cfmoto|microcar|aixam|ligier|citro[eë]n\s+ami|microlino)\b/i.test(s)) {
+  if (/\b(cargo\s+quad|utility\s+quad|utv\s+cargo|φορτηγό\s+τετράκυκλο|polaris\s+ranger|can-?am\s+defender|can-?am\s+traxter|john\s+deere\s+gator|piaggio\s+ape)\b/i.test(s)) {
+    return 'quadricycle_cargo';
+  }
+  if (/\b(quad|atv|buggy|utv|can-?am|polaris\s+sportsman|polaris\s+rzr|cf\s*moto|cfmoto|microcar|aixam|ligier|citro[eë]n\s+ami|fiat\s+topolino|mobilize\s+duo|microlino|yamaha\s+(?:grizzly|kodiak|raptor\s+700)|honda\s+trx)\b/i.test(s)) {
     return 'quadricycle';
   }
   if (
-    /\b(motorrad|motorcycle|μοτοσικλέτα|scooter|ducati|panigale|multistrada|monster\b|scrambler|harley-?davidson|yamaha\s+(?:mt|yzf|r1|r6|r7|tenere|tmax|xmax)|honda\s+(?:cbr|crf|africa\s+twin|nc750|forza|sh\d{3}|goldwing)|kawasaki\s+(?:ninja|z\d{3}|versys)|suzuki\s+(?:gsx|v-?strom|hayabusa)|ktm\s+(?:\d{3,4}\s+duke|adventure|super\s+duke)|triumph\s+(?:tiger|street\s+triple|speed\s+triple|bonneville)|bmw\s+(?:r\s*1250\s*gs|r\s*1300\s*gs|s\s*1000\s*rr|s\s*1000\s*xr|f\s*900|f\s*850\s*gs|c\s*400)|piaggio|vespa|aprilia\s+(?:rsv4|tuono|tuareg)|moto\s+guzzi|husqvarna)\b/i.test(
+    /\b(motorrad|motorcycle|μοτοσικλέτα|scooter|ducati|panigale|multistrada|monster\b|scrambler|diavel|streetfighter|hypermotard|harley-?davidson|yamaha\s+(?:mt|yzf|r1|r6|r7|r3|tenere|ténéré|tmax|xmax|nmax|tracer|xsr)|honda\s+(?:cbr|cb\d{3,4}|crf|africa\s+twin|nc750|forza|sh\s*\d{3}|pcx|adv\s*350|x-?adv|goldwing|transalp|hornet)|kawasaki\s+(?:ninja|z\s*\d{3,4}|versys|vulcan|zx)|suzuki\s+(?:gsx|v-?strom|hayabusa|sv\s*650|burgman)|ktm\s+(?:\d{3,4}\s*duke|adventure|super\s+duke|rc\s*\d{3}|exc)|triumph\s+(?:tiger|street\s+triple|speed\s+triple|bonneville|trident|rocket\s+3|scrambler)|bmw\s+(?:r\s*1200\s*gs|r\s*1250\s*gs|r\s*1300\s*gs|r\s*nine\s*t|s\s*1000\s*rr|s\s*1000\s*xr|s\s*1000\s*r|m\s*1000|f\s*900|f\s*850\s*gs|f\s*800\s*gs|f\s*750\s*gs|c\s*400|ce\s*04)|piaggio|vespa|aprilia\s+(?:rsv4|tuono|tuareg|rs\s*660)|moto\s+guzzi|husqvarna|royal\s+enfield|indian\s+(?:scout|chief|challenger)|sym\b|kymco|benelli|mv\s+agusta)\b/i.test(
       s
     )
   ) {
@@ -764,6 +818,7 @@ export function normalizeFuelType(rawText = '') {
   }
   if (/mild.?hybrid|\bmhev\b|48\s?v|\betsi\b|eq\s?boost/.test(s)) return 'mild_hybrid';
   if (/hybrid|hybryda|ibrida|híbrido|υβριδικ|elektr.*\/.*benz|benz.*\/.*elektr|elektr.*\/.*dies|dies.*\/.*elektr/.test(s)) return 'hybrid';
+  if (/\b(lpg|cng|autogas|erdgas|gpl|metano|eco-?g|tgi|g-?tec|bi-?fuel|υγραέριο|φυσικό\s+αέριο)\b/.test(s)) return 'lpg_cng';
   if (/diesel|πετρέλαιο|\bon\b|\btdi\b|\bcdi\b|\bdci\b|\bbluehdi\b/.test(s)) return 'diesel';
   return 'petrol';
 }
@@ -824,8 +879,9 @@ function runSingleStatutoryScenario({
   const shippingEur = customShippingEur != null ? Number(customShippingEur) : geo.shipping;
 
   // Non-EU Common Customs Tariff Duty (Δασμός ΚΕΔ / TARIC) on CIF (Purchase + Transport to EU border)
+  const isHistoric30 = category === 'historic' || (ageYears >= 30 && category === 'passenger' && regYear <= clearanceYear - 30);
   const isNonEu = !geo.eu || vatRegime === 'non_eu_cif';
-  const dutyRate = isNonEu ? thirdCountryTaricDutyRate(category, cc, fuel) : 0;
+  const dutyRate = isNonEu ? thirdCountryTaricDutyRate(isHistoric30 ? 'historic' : category, cc, fuel) : 0;
   const customsDutyEur = isNonEu ? Math.round((purchaseEur + shippingEur) * dutyRate) : 0;
 
   let baseValueEur = listPriceEur + extrasEur;
@@ -872,23 +928,41 @@ function runSingleStatutoryScenario({
     exemptionLabel = isEV
       ? '100% Exempt Electric Bus (Άρθρο 141 §1 εδ. β΄)'
       : `Statutory Flat Bus Tax = 1 Year Road Tax (${seats} seats → €${oneYearBusTax}, Άρθρο 141 §1)`;
+  } else if (category === 'emergency_special') {
+    // 2B. AMBULANCES, HEARSES & CIVIL PROTECTION VEHICLES (ν. 5222/2025 Άρθρο 141 §1 & Άρθρο 148 §10–13)
+    baseValueEur = purchaseEur;
+    taxableEur = purchaseEur;
+    registrationTaxEur = isEV ? 0 : 53;
+    roadTaxEur = isEV ? 0 : 53;
+    euroLabel = 'Special Purpose Ambulance / Hearse / Civil Protection (Δ.Κ. 87.03 / 87.05)';
+    exemptionShare = isEV ? 1.0 : 0;
+    exemptionLabel = isEV
+      ? '100% Exempt Electric Special Purpose Vehicle (Άρθρο 141 §1)'
+      : 'Flat Statutory Special Vehicle Tax €53 (= 1 Year Road Tax, Άρθρο 141 §1 • €0 for EKAB/Civil Protection under Άρθρο 148 §10–13)';
   } else if (category === 'motorcycle') {
-    // 3. MOTORCYCLES & SCOOTERS (Δ.Κ. 87.11 — ν. 5222/2025 Άρθρο 140 §1–2)
-    // Statutory Wholesale Age Depreciation (Άρθρο 140 §2α):
-    if (ageMonths < 12) ageDepPct = 0;
-    else if (ageMonths <= 24) ageDepPct = 14;
-    else if (ageMonths <= 36) ageDepPct = 21;
-    else if (ageMonths <= 48) ageDepPct = 25;
-    else if (ageMonths <= 60) ageDepPct = 32;
-    else if (ageMonths <= 72) ageDepPct = 35;
-    else if (ageMonths <= 84) ageDepPct = 39;
-    else if (ageMonths <= 96) ageDepPct = 42;
-    else ageDepPct = 46;
+    // 3. MOTORCYCLES & SCOOTERS (Δ.Κ. 87.11 — ν. 5222/2025 Άρθρο 140 §1–4)
+    const isNewMoto = ageMonths < 6 && effectiveKm < 6000;
+    if (isNewMoto) {
+      ageDepPct = 0;
+      baseValueEur = purchaseEur;
+      taxableEur = purchaseEur + customsDutyEur + Math.min(shippingEur, 500);
+    } else {
+      // Statutory Wholesale Age Depreciation (Άρθρο 140 §2α):
+      if (ageMonths < 12) ageDepPct = 0;
+      else if (ageMonths <= 24) ageDepPct = 14;
+      else if (ageMonths <= 36) ageDepPct = 21;
+      else if (ageMonths <= 48) ageDepPct = 25;
+      else if (ageMonths <= 60) ageDepPct = 32;
+      else if (ageMonths <= 72) ageDepPct = 35;
+      else if (ageMonths <= 84) ageDepPct = 39;
+      else if (ageMonths <= 96) ageDepPct = 42;
+      else ageDepPct = 46;
 
-    baseValueEur = listPriceEur;
-    const depreciatedWholesale = baseValueEur * (1 - ageDepPct / 100);
-    // Statutory Floor (Άρθρο 140 §2α εδ. γ΄): Cannot be lower than actual purchase invoice + duty + transport!
-    taxableEur = Math.max(depreciatedWholesale, purchaseEur) + customsDutyEur + Math.min(shippingEur, 500);
+      baseValueEur = listPriceEur;
+      const depreciatedWholesale = baseValueEur * (1 - ageDepPct / 100);
+      // Statutory Floor (Άρθρο 140 §2α εδ. γ΄): Cannot be lower than actual purchase invoice + duty + transport!
+      taxableEur = Math.max(depreciatedWholesale, purchaseEur) + customsDutyEur + Math.min(shippingEur, 500);
+    }
 
     if (isEV || cc <= 125) priceBandRate = 0;
     else if (cc <= 249) priceBandRate = 0.02;
@@ -898,14 +972,19 @@ function runSingleStatutoryScenario({
     else if (cc <= 1800) priceBandRate = 0.17;
     else priceBandRate = 0.25;
 
-    effectiveRate = priceBandRate;
+    // Άρθρο 140 §4: +30% surcharge for older motorcycles not meeting Directive 2002/51/EC (<2004)
+    if (!isEV && cc > 125 && regYear < 2004) {
+      euroSurcharge = 0.30;
+    }
+
+    effectiveRate = priceBandRate * (1 + euroSurcharge);
     registrationTaxEur = Math.round(taxableEur * effectiveRate);
-    euroLabel = `Motorcycle ${cc} cc (Άρθρο 140 §1 — ${Math.round(priceBandRate * 100)}% flat cc bracket)`;
+    euroLabel = `Motorcycle ${cc} cc (Άρθρο 140 §1 — ${(effectiveRate * 100).toFixed(1).replace(/\.0$/, '')}% rate${euroSurcharge > 0 ? ' incl. +30% pre-2002/51/EC surcharge' : ''})`;
     exemptionShare = isEV || cc <= 125 ? 1.0 : 0;
     exemptionLabel =
       isEV || cc <= 125
         ? '100% Exempt (≤125 cc or Pure Electric Motorcycle — Άρθρο 140/141)'
-        : `${Math.round(priceBandRate * 100)}% Motorcycle Rate (${cc} cc) • Max 46% age depreciation with invoice floor`;
+        : `${(effectiveRate * 100).toFixed(1).replace(/\.0$/, '')}% Motorcycle Rate (${cc} cc) • Max 46% wholesale age dep. with invoice floor`;
     roadTaxEur = roadTaxByCc(cc, regYear, true, isEV);
   } else if (category === 'quadricycle' || category === 'quadricycle_cargo') {
     // 4. L-CATEGORY TRICYCLES / QUADRICYCLES / ATVs / BUGGIES / MICROCARS (Κανονισμός 168/2013)
@@ -924,18 +1003,21 @@ function runSingleStatutoryScenario({
     registrationTaxEur = Math.round(taxableEur * effectiveRate);
     euroLabel = `EU Reg. 168/2013 L-Category (${cc} cc)`;
     exemptionLabel = isCargo
-      ? `Cargo L-Category Rate ${Math.round(priceBandRate * 100)}% (Άρθρο 139 §1η)`
+      ? `Cargo L-Category Rate ${Math.round(priceBandRate * 100)}% (Άρθρο 139 §1στ)`
       : `Passenger L-Category Rate ${Math.round(priceBandRate * 100)}% (Άρθρο 136 §2β)`;
     roadTaxEur = roadTaxByCc(cc, regYear, true, isEV);
   } else if (category.startsWith('truck_')) {
-    // 5. COMMERCIAL TRUCKS, PICKUPS, VANS & HEAVY TRUCKS (Δ.Κ. 87.04 / 87.03 / 87.01 — Άρθρο 139)
+    // 5. COMMERCIAL TRUCKS, PICKUPS, VANS, CONVERTED VANS & HEAVY TRUCKS (Δ.Κ. 87.04 / 87.03 / 87.01 — Άρθρο 139)
     const isHeavy = category === 'truck_heavy';
     const isChassis = category === 'truck_chassis';
     const isClosedVan = category === 'truck_van_closed';
+    const isConvertedVan = category === 'truck_van_from_passenger';
 
-    // Base Euro 6 / VI Rate (Άρθρο 139 §1α–ε)
+    // Base Euro 6 / VI Rate (Άρθρο 139 §1α–ε & §2)
     if (isEV) {
       priceBandRate = 0; // Άρθρο 139 §6: Pure electric & hydrogen trucks are 0%
+    } else if (isConvertedVan) {
+      priceBandRate = 0.30; // Άρθρο 139 §2: Closed van converted from passenger car = 3 × 10% = 30% on Passenger Taxable Value!
     } else if (isHeavy || isChassis) {
       priceBandRate = 0.05; // 5% for heavy trucks >3.5t (§1α) and chassis-cabs (§1δ)
     } else if (isClosedVan) {
@@ -944,9 +1026,9 @@ function runSingleStatutoryScenario({
       priceBandRate = 0.08; // 8% for open pickups ≤3.5t (§1β) and double-cab pickups ≤3.5t (§1ε)
     }
 
-    // Euro Emission Surcharge for Trucks (Άρθρο 139 §1στ) & Environmental Levy (ν. 4710/2020 Άρθρο 5 §2)
-    // Note: Trucks have +30% for Euro 5 / V and +100% for Euro 4 / IV!
-    if (regYear >= 2016 || (regYear === 2015 && regMonth >= 9)) {
+    // Euro Emission Surcharge for Trucks (Άρθρο 139 §1στ, ΠΑΡΑΡΤΗΜΑ III B.5) & Environmental Levy (ν. 4710/2020 Άρθρο 5 §2)
+    // Heavy trucks (>3.5t) entered mandatory Euro VI on 31/12/2013 (regYear >= 2014); light N1 trucks on 01/09/2015–2016
+    if ((isHeavy && regYear >= 2014) || regYear >= 2016 || (regYear === 2015 && regMonth >= 9)) {
       euroSurcharge = 0;
       euroLabel = 'Euro 6 / Euro VI Commercial (0% surcharge)';
     } else if (regYear >= 2009) {
@@ -970,8 +1052,9 @@ function runSingleStatutoryScenario({
       ageDepPct = 0;
       kmDepPct = 0;
     } else {
-      // Light trucks / vans / pickups ≤3.5t (Άρθρο 139 §3): Depreciated ΛΤΠΦ + Extras
-      const colIdx = DEPRECIATION_COLUMNS.indexOf(isClosedVan ? 'mpv' : 'suv');
+      // Light trucks / vans / pickups ≤3.5t (Άρθρο 139 §3) & Converted Vans (Άρθρο 139 §2): Depreciated ΛΤΠΦ + Extras
+      const colName = isConvertedVan ? body : isClosedVan ? 'mpv' : 'suv';
+      const colIdx = Math.max(0, DEPRECIATION_COLUMNS.indexOf(colName));
       ageDepPct = ageMonths >= 192 ? 95 : (DEPRECIATION_TABLE[ageMonths]?.[colIdx] ?? 70);
       const afterAge = baseValueEur * (1 - ageDepPct / 100);
       const allowanceKm = (15000 * ageMonths) / 12;
@@ -986,7 +1069,9 @@ function runSingleStatutoryScenario({
     exemptionShare = isEV ? 1.0 : 0;
     exemptionLabel = isEV
       ? '100% Exempt Electric/Hydrogen Commercial Truck (Άρθρο 139 §6)'
-      : `Commercial Truck Base ${(priceBandRate * 100).toFixed(0)}% × ${(1 + euroSurcharge).toFixed(2)} Euro factor = ${(effectiveRate * 100).toFixed(2)}%`;
+      : isConvertedVan
+        ? `Converted Passenger Van 3×10% = 30% × ${(1 + euroSurcharge).toFixed(2)} = ${(effectiveRate * 100).toFixed(1)}% on Passenger Taxable Value (Άρθρο 139 §2)`
+        : `Commercial Truck Base ${(priceBandRate * 100).toFixed(0)}% × ${(1 + euroSurcharge).toFixed(2)} Euro factor = ${(effectiveRate * 100).toFixed(2)}%`;
     roadTaxEur = roadTaxForTruck(isHeavy ? Math.max(12000, gvwKg) : Math.min(3500, gvwKg), isEV);
   } else if (category === 'moik') {
     // 6. INDIVIDUALLY APPROVED CUSTOM / KIT CARS (Μ.Ο.Ι.Κ. — Άρθρο 136 §10)
@@ -1002,7 +1087,7 @@ function runSingleStatutoryScenario({
     exemptionLabel = `Flat Statutory Tax €${registrationTaxEur} by Engine Displacement`;
     roadTaxEur = roadTaxByCc(cc, 2000, false, isEV);
   } else {
-    // 7. PASSENGER CARS, SUPERCARS, MOTORHOMES, TAXIS & MULTI-CHILD FAMILIES (Δ.Κ. 87.03 — Άρθρο 136, 138, 142, 149)
+    // 7. PASSENGER CARS, SUPERCARS, MOTORHOMES, TAXIS, MULTI-CHILD, DISABLED ΑμεΑ & REPATRIATION (Δ.Κ. 87.03 — Άρθρα 136, 138, 142, 148, 149)
     const effectiveBody = category === 'motorhome' ? 'mpv' : body;
     const colIdx = Math.max(0, DEPRECIATION_COLUMNS.indexOf(effectiveBody));
     ageDepPct = ageMonths >= 192 ? 95 : (DEPRECIATION_TABLE[ageMonths]?.[colIdx] ?? 70);
@@ -1012,10 +1097,8 @@ function runSingleStatutoryScenario({
     const excessKm = Math.max(0, effectiveKm - allowanceKm);
     kmDepPct = Math.min(10, Math.floor(excessKm / 500) * 0.10);
 
+    // Per ν. 5222/2025 Άρθρο 142 §1 & ΑΑΔΕ Α.1203/2019 Άρθρο 2 §6, ΛΤΠΦ already includes customs duty; never add customsDutyEur into taxableEur.
     taxableEur = Math.max(baseValueEur * 0.05, afterAgeEur * (1 - kmDepPct / 100));
-    if (isNonEu) {
-      taxableEur += customsDutyEur;
-    }
 
     // Progressive Scale on PRE-depreciation baseValueEur (Άρθρο 136 §2α)
     const scaleTax = progressiveTax(baseValueEur);
@@ -1061,7 +1144,7 @@ function runSingleStatutoryScenario({
     effectiveRate = priceBandRate * co2Factor * (1 + euroSurcharge);
     const rawRegTax = isEV ? 0 : taxableEur * effectiveRate;
 
-    // Statutory Exemptions (BEV 100%, PHEV 75%/50%, Motorhome 75%, Taxi 87%, Multi-Child 100%/50%)
+    // Statutory Exemptions (BEV 100%, PHEV 75%/50%, MHEV/HEV 50%, Motorhome 75%, Taxi 87%, Multi-Child 100%/50%, Disabled ΑμεΑ 100%/80%, Repatriation 80%)
     if (isEV) {
       exemptionShare = 1.0;
       exemptionLabel = '100% Exempt (Pure Electric BEV / Hydrogen)';
@@ -1079,21 +1162,46 @@ function runSingleStatutoryScenario({
         exemptionShare = 0.50;
         exemptionLabel = `50% Multi-Child Family Exemption (${cc} cc > 2,000 cc — Άρθρο 149)`;
       }
-    } else if (fuel === 'plugin_hybrid' || fuel === 'hybrid') {
-      if (clearanceIso < '2027-01-01' && co2 <= 50) {
+    } else if (category === 'disabled_amea') {
+      if (cc <= 1650) {
+        exemptionShare = 1.0;
+        exemptionLabel = `100% Disabled ΑμεΑ Exemption (${cc} cc ≤ 1,650 cc — Άρθρο 148 §2 & ν. 490/1976)`;
+      } else {
+        exemptionShare = 0.80;
+        exemptionLabel = `80% Disabled ΑμεΑ Partial Relief (${cc} cc > 1,650 cc — Άρθρο 148 §3α, or 100% if paraplegia ≤3,650 cc)`;
+      }
+    } else if (category === 'repatriation') {
+      if (cc <= 2000) {
+        exemptionShare = 0.80;
+        exemptionLabel = `80% Repatriation / Μετοικεσία Exemption (${cc} cc ≤ 2,000 cc — Άρθρο 148 §3α & Δ.245/1988, pays 20%)`;
+      } else {
+        exemptionShare = Math.min(0.80, Number(((0.80 * 2000) / cc).toFixed(4)));
+        exemptionLabel = `${(exemptionShare * 100).toFixed(1)}% Repatriation / Μετοικεσία Proportional Relief (${cc} cc > 2,000 cc — Άρθρο 148 §3α)`;
+      }
+    } else if (fuel === 'plugin_hybrid' || fuel === 'hybrid' || fuel === 'mild_hybrid') {
+      if (fuel === 'plugin_hybrid' && clearanceIso < '2027-01-01' && co2 <= 50) {
         exemptionShare = 0.75;
-        exemptionLabel = '75% PHEV Exemption (≤50 g/km CO₂ until 31/12/2026, V34/V35)';
+        exemptionLabel = '75% PHEV Exemption (≤50 g/km CO₂ until 31/12/2026, V34/V35 — ν. 5313/2026 Άρθ. 10)';
+      } else if ((fuel === 'plugin_hybrid' || fuel === 'hybrid') && clearanceIso <= '2026-05-31' && co2 >= 51 && co2 <= 75) {
+        exemptionShare = 0.75;
+        exemptionLabel = '75% Transitional Hybrid Exemption (51–75 g/km CO₂ until 31/05/2026, V38/V39 — Άρθ. 136 §6α)';
       } else {
         exemptionShare = 0.50;
-        exemptionLabel = '50% Hybrid Exemption (V32/V33)';
+        exemptionLabel =
+          fuel === 'mild_hybrid'
+            ? '50% Mild Hybrid (MHEV 48V) Exemption (V32/V33 — ν. 5222/2025 Άρθ. 136 §6 & Ε.2039/2026)'
+            : '50% Hybrid Exemption (V32/V33 — ν. 5222/2025 Άρθ. 136 §6)';
       }
+    } else if (fuel === 'lpg_cng') {
+      exemptionShare = 0;
+      exemptionLabel = 'Bi-Fuel LPG / CNG (Assessed on Gas CO₂ Emissions — ν. 5222/2025 Άρθ. 136 §4)';
     }
 
     registrationTaxEur = Math.round(rawRegTax * (1 - exemptionShare));
     envLevyEur = Math.round(envLevyFull * (isEV ? 0 : 1 - exemptionShare));
 
     // Annual Road Tax (Τέλη Κυκλοφορίας)
-    if (isEV) {
+    if (isEV || category === 'disabled_amea') {
       roadTaxEur = 0;
     } else if (category === 'motorhome' || regKey < 20101101) {
       roadTaxEur = roadTaxByCc(cc, regYear, false, false);
@@ -1227,34 +1335,58 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
     ? rawProfile.roadsterRe.test(combinedText)
     : /roadster|cabrio|spyder|spider|convertible|targa|aperta/i.test(combinedText);
 
+  const inferredCategory = inferVehicleCategory(combinedText, reg.year);
+  const universalSpec = inferUniversalSpecsFromText(combinedText, reg.year, inferredCategory, 'petrol');
+
   const explicitItemFuel = item.fuelType ? normalizeFuelType(item.fuelType) : null;
   const fuel =
     overrides.fuel ||
-    (rawProfile ? rawProfile.fuel : explicitItemFuel || normalizeFuelType(combinedText));
+    (rawProfile
+      ? rawProfile.fuel
+      : explicitItemFuel || universalSpec.fuel || normalizeFuelType(combinedText));
 
   // Only apply a model profile's specs/label if the user didn't explicitly override fuel to an incompatible drivetrain (e.g. switching BMW i8 to Electric BEV)
   const profile =
-    rawProfile && (!overrides.fuel || overrides.fuel === rawProfile.fuel || (overrides.fuel === 'hybrid' && rawProfile.fuel === 'plugin_hybrid'))
+    rawProfile &&
+    (!overrides.fuel ||
+      overrides.fuel === rawProfile.fuel ||
+      (overrides.fuel === 'hybrid' && rawProfile.fuel === 'plugin_hybrid'))
       ? rawProfile
       : null;
 
   const category =
     overrides.category ||
     item.category ||
-    (profile?.category ? profile.category : inferVehicleCategory(combinedText, reg.year));
+    (inferredCategory !== 'passenger'
+      ? inferredCategory
+      : profile?.category || universalSpec.category || inferredCategory);
   const catMeta = VEHICLE_CATEGORIES.find((c) => c.id === category) || VEHICLE_CATEGORIES[0];
 
-  const body = overrides.body || (profile ? profile.body(isRoadster, combinedText) : inferBodyClass(combinedText));
+  const body =
+    overrides.body ||
+    (profile ? profile.body(isRoadster, combinedText) : universalSpec.body || inferBodyClass(combinedText));
   const isPureEvOrH2 = fuel === 'electric' || fuel === 'hydrogen';
-  const cc = isPureEvOrH2
+  let rawCc = isPureEvOrH2
     ? 0
     : Number(
         overrides.cc ||
           item.cc ||
-          (profile ? profile.cc : category === 'motorcycle' ? 1000 : category === 'bus' ? 7700 : 1998)
+          (profile
+            ? profile.cc
+            : universalSpec.cc ||
+              (category === 'motorcycle' ? 650 : category === 'quadricycle' || category === 'quadricycle_cargo' ? 500 : category === 'bus' ? 7700 : 1998))
       );
-  const gvwKg = Number(overrides.gvwKg || item.gvwKg || (category === 'truck_heavy' ? 18000 : 3000));
-  const seats = Number(overrides.seats || item.seats || (category === 'bus' ? 50 : 5));
+  // Rotary Wankel 2x statutory engine displacement rule (ν. 5222/2025 Άρθρο 143)
+  if (!isPureEvOrH2 && universalSpec.wankel && rawCc > 0 && rawCc <= 1600) {
+    rawCc = rawCc * 2;
+  }
+  const cc = rawCc;
+  const gvwKg = Number(
+    overrides.gvwKg || item.gvwKg || universalSpec.gvwKg || (category === 'truck_heavy' ? 18000 : 3000)
+  );
+  const seats = Number(
+    overrides.seats || item.seats || universalSpec.seats || (category === 'bus' ? 50 : 5)
+  );
   const vatRegime =
     overrides.vatRegime ||
     item.vatRegime ||
@@ -1279,12 +1411,12 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
   let listPriceRange;
   let listPriceSource;
   let confidence = 'medium';
-  if (overrides.listPriceEur && Number(overrides.listPriceEur) > 1000) {
+  if (overrides.listPriceEur && Number(overrides.listPriceEur) >= 500) {
     const manualLp = Number(overrides.listPriceEur);
     listPriceRange = { low: manualLp, mid: manualLp, high: manualLp };
     listPriceSource = 'Manual ΛΤΠΦ / Wholesale Override';
     confidence = 'high';
-  } else if (item.decodedVin?.listPriceEur && Number(item.decodedVin.listPriceEur) > 1000) {
+  } else if (item.decodedVin?.listPriceEur && Number(item.decodedVin.listPriceEur) >= 500) {
     const vinLp = Number(item.decodedVin.listPriceEur);
     listPriceRange = { low: vinLp, mid: vinLp, high: vinLp };
     listPriceSource = item.decodedVin.rdwCatalogPriceEur
@@ -1298,9 +1430,33 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
       : rawRange;
     listPriceSource = hasVerifiedIdentity ? `${profile.label} (VIN-Locked Exact ΛΤΠΦ)` : profile.label;
     confidence = profile.confidence || 'high';
-  } else if (category === 'bus' || category === 'truck_heavy' || category === 'historic' || category === 'moik') {
+  } else if (universalSpec.listPriceEur && !isPureEvOrH2) {
+    const midLp = universalSpec.listPriceEur;
+    listPriceRange = hasVerifiedIdentity
+      ? { low: midLp, mid: midLp, high: midLp }
+      : { low: Math.round(midLp * 0.92), mid: midLp, high: Math.round(midLp * 1.08) };
+    listPriceSource = universalSpec.label || `Universal Homologation Profile (€${midLp.toLocaleString()})`;
+    confidence = 'high';
+  } else if (
+    category === 'bus' ||
+    category === 'truck_heavy' ||
+    category === 'historic' ||
+    category === 'moik' ||
+    category === 'emergency_special'
+  ) {
     listPriceRange = { low: item.priceEur, mid: item.priceEur, high: item.priceEur };
     listPriceSource = `${catMeta.shortLabel} — Assessed on Purchase Invoice / Fixed Scale (${catMeta.lawRef})`;
+    confidence = 'high';
+  } else if (category === 'motorcycle') {
+    // Motorcycles (ν. 5222/2025 Άρθρο 140 §2α): Assessed on International Wholesale Price when new (~78% of new retail MSRP)
+    const motoAgeYears = Math.min(10, midAgeMonths / 12);
+    const motoRetention = Math.max(0.38, 1 - motoAgeYears * 0.065);
+    const estNewRetailNet = item.priceEur / (1 + geo.vat) / motoRetention;
+    const midWholesale = Math.max(item.priceEur, Math.round(estNewRetailNet * 0.78));
+    listPriceRange = hasVerifiedIdentity
+      ? { low: midWholesale, mid: midWholesale, high: midWholesale }
+      : { low: Math.round(midWholesale * 0.92), mid: midWholesale, high: Math.round(midWholesale * 1.08) };
+    listPriceSource = `Motorcycle International Wholesale Value (Τιμή Χονδρικής Πώλησης €${midWholesale.toLocaleString()} — Άρθρο 140 §2α)`;
     confidence = 'high';
   } else {
     const kmFactor = Math.min(1.25, Math.max(0.80, 1 + (0.0025 * (effectiveKm - allowanceKm)) / 1000));
@@ -1377,6 +1533,9 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
   } else if (profile) {
     const rawCo2 = profile.co2RangeByYear(reg.year, isRoadster, combinedText);
     co2Range = hasVerifiedIdentity ? { low: rawCo2.mid, mid: rawCo2.mid, high: rawCo2.mid } : rawCo2;
+  } else if (universalSpec.co2 != null) {
+    const m = universalSpec.co2;
+    co2Range = hasVerifiedIdentity ? { low: m, mid: m, high: m } : { low: Math.max(0, m - 8), mid: m, high: m + 8 };
   } else if (fuel === 'plugin_hybrid') {
     co2Range = hasVerifiedIdentity ? { low: 44, mid: 44, high: 44 } : { low: 34, mid: 44, high: 54 };
   } else if (fuel === 'hybrid') {
@@ -1501,7 +1660,7 @@ export function calculateGreekImport(item, query = '', overrides = {}) {
   const warnings = [
     `${catMeta.shortLabel} (${catMeta.tariffCode}): Governed by ${catMeta.lawRef}.`,
     'ΑΑΔΕ Α.1043/2025 (ΦΕΚ Β΄ 1257/2025): Exact valuation uses the 17-char VIN Equipment Card (Eurotax / DAT SilverDAT3 / PartsLink / Official Importer) + Δήλωση Εξοπλισμού και Αξίας (Annex I/II).',
-    'ΑΑΔΕ Α.1108/2025: For EU used vehicles under the Art. 52 VAT margin scheme, Greek customs requires bank wire proof for >50% of the invoice and customs code 2021.',
+    'ν. 5313/2026 Άρθρο 11 & ΑΑΔΕ Ε.2036/2026 (amending ν. 5222/2025 Άρθρο 146 §8): Greek customs requires 100% of the total invoice value to be paid via bank transfer prior to ΔΕΦΚ submission (and customs code 2021 for Art. 52 margin scheme vehicles).',
   ];
   if (midScenario.registrationBanned) {
     warnings.unshift(
